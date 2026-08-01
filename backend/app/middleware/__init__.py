@@ -7,11 +7,13 @@ application factory calls exactly once.
 """
 
 from app.middleware.cors import configure_cors
+from app.middleware.observability import ObservabilityMiddleware
 from app.middleware.registration import register_middlewares
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
+    "ObservabilityMiddleware",
     "RequestIDMiddleware",
     "SecurityHeadersMiddleware",
     "configure_cors",

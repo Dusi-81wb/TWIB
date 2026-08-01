@@ -56,7 +56,7 @@ Sprint 1
 
 # Current Phase
 
-Phase 1.11 — Docker Production
+Phase 1.13 — Foundation Review
 
 ---
 
@@ -68,8 +68,8 @@ Phase 1.11 — Docker Production
 
 # Current Objective
 
-Establish the Docker production foundation for the TWIB backend
-(multi-stage production image and a production Docker Compose stack).
+Review the foundation phases (1.1–1.12) for consistency, correctness, and
+readiness before the first feature phase.
 
 Do NOT implement
 
@@ -83,40 +83,36 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 1.10
+✅ Phase 1.12
 
 Completed
 
-- `Dockerfile` (repository root): Python 3.12 development image using uv,
-  installs runtime and development dependencies, runs uvicorn with hot
-  reload (`--reload`) as a non-root user (uid 1000), and exposes port 8000
-- `.dockerignore` (repository root): whitelist build context that sends
-  only the `backend/` subtree to the Docker daemon (excludes `.venv`,
-  caches, and environment files)
-- `docker/development/docker-compose.yml`: development stack with
-  `backend`, `postgres`, `redis`, and `qdrant` services on a single
-  `twib-dev` bridge network
-- Named volumes (`postgres_data`, `redis_data`, `qdrant_data`) persist
-  supporting-service data across restarts
-- Backend service reads configuration from `backend/.env` through the
-  existing settings system; no secrets are hardcoded anywhere
-- Backend source is bind-mounted (`backend/app`) so uvicorn's reloader
-  picks up changes; healthchecks and `depends_on: service_healthy` gate
-  backend startup on the supporting services
-- No production Dockerfile, production compose, Kubernetes, NGINX, CI/CD,
-  Terraform, or Helm was created
-- `backend/README.md` documents Docker development, starting and stopping
-  containers, and useful commands
+- `Dockerfile` (repository root): upgraded to a multi-stage build with a
+  `runtime` production stage and a default `development` stage
+- `docker/production/docker-compose.yml`: production stack with `backend`,
+  `postgres`, `redis`, and `qdrant` on a dedicated `twib-prod` network
+- `runtime` stage installs only locked runtime dependencies (`uv sync
+  --frozen --no-dev`), copies the compiled virtual environment and the
+  application source, runs as the non-root `twib` user, and registers a
+  Docker `HEALTHCHECK` against `/api/v1/health`
+- The production stack builds `target: runtime`, forces `APP_ENV=production`,
+  uses named volumes, restart policies, health checks, and no bind mounts
+  or hot reload
+- No Kubernetes, Helm, Terraform, GitHub Actions, NGINX, Traefik, cloud
+  deployment, monitoring, observability, or application changes were made
+- `backend/README.md` documents building the production image, running the
+  production stack, production notes, and the difference between the
+  development and production setups
 
-(Previous: ✅ Phase 1.9 — Testing Infrastructure)
+(Previous: ✅ Phase 1.11 — Observability Foundation)
 
 ---
 
 # Next Milestone
 
-Phase 1.11
+Phase 1.13
 
-Docker Production
+Foundation Review
 
 ---
 
@@ -254,8 +250,7 @@ _Not committed yet_
 # Files Modified This Sprint
 
 - Dockerfile
-- .dockerignore
-- docker/development/docker-compose.yml
+- docker/production/docker-compose.yml
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -357,11 +352,25 @@ _Not committed yet_
 
 ## Phase 1.11
 
-- [ ] Multi-stage production Dockerfile
-- [ ] Production Docker Compose
-- [ ] Docker image optimization
-- [ ] Production health checks
-- [ ] README documentation for production Docker
+- [x] `RequestContext` object (`app/observability/request_context.py`)
+- [x] Event definitions (`app/observability/events.py`)
+- [x] Metrics interfaces (`app/observability/metrics.py`)
+- [x] Tracing interfaces (`app/observability/tracing.py`)
+- [x] `ObservabilityMiddleware` (`app/middleware/observability.py`)
+- [x] Middleware registered in the application stack
+- [x] README documentation for observability
+
+## Phase 1.12
+
+- [x] Multi-stage production Dockerfile
+- [x] Production Docker Compose
+- [x] Docker image optimization
+- [x] Production health checks
+- [x] README documentation for production Docker
+
+## Phase 1.13
+
+- [ ] Foundation review
 
 ---
 
@@ -473,11 +482,135 @@ Completed
 
 - Phase 1.10 Docker Development Environment
 
+Session 12
+
+Completed
+
+- Phase 1.11 Observability Foundation
+
+Session 13
+
+Completed
+
+- Phase 1.12 Docker Production
+
 Next Session
 
-Phase 1.11
+Phase 1.13
 
-Docker Production
+Foundation Review
+
+---
+
+# Phase 1.12 Summary
+
+## Files Created
+
+- docker/production/docker-compose.yml
+
+## Files Modified
+
+- Dockerfile
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Architectural Decisions
+
+- The single root `Dockerfile` is now multi-stage. `runtime` is the minimal
+  production image and `development` is the default (last) stage, so the
+  unchanged development Compose stack (`docker compose build`, no target)
+  still produces the development image while the production stack builds
+  `target: runtime`.
+- The `runtime` stage installs only the locked runtime dependencies
+  (`uv sync --frozen --no-dev`) and copies only the compiled virtual
+  environment and the application source; the `uv` CLI, manifest files, and
+  dev dependencies are not present in the final image.
+- The image runs as the non-root `twib` user (uid/gid 1000) and registers a
+  Docker `HEALTHCHECK` against `/api/v1/health` using the standard library
+  `urllib` (no extra binaries in the image).
+- `docker/production/docker-compose.yml` mirrors the development services
+  but uses a dedicated `twib-prod` network and project name, `build.target:
+  runtime`, `APP_ENV=production` (forced), named volumes, `restart:
+  unless-stopped` on every service, health-check-gated `depends_on`, and
+  no bind mounts or hot reload.
+- Only the backend publishes a host port (`8000:8000`); supporting-service
+  ports are not exposed on the host in production.
+- No Kubernetes, Helm, Terraform, GitHub Actions, NGINX, Traefik, cloud
+  deployment, monitoring, observability, or application changes were made.
+
+## Suggestions (Not Implemented)
+
+- Docker could not be executed during this phase (per the phase rules), so
+  the image build and `docker compose up` were not verified at runtime.
+  Run `docker compose -f docker/production/docker-compose.yml config`,
+  `docker build --target runtime -t twib-backend:production ../..`, and
+  `docker compose up` after this phase to confirm the production stack
+  starts and the health checks pass.
+- The production image runs a single uvicorn worker. Add `--workers` (or
+  compose replicas) once the workload requires it.
+- The uv image is pinned to `ghcr.io/astral-sh/uv:latest` in both build
+  chains. Pin a specific uv release for fully reproducible builds.
+- The `development` stage still uses `uv sync --all-groups` (not
+  `--frozen`). Switch it to `--frozen` once the lockfile is verified fresh.
+- Supporting-service image tags (postgres 17, redis 7, qdrant v1.14.0)
+  should be reviewed when the database and cache phases land.
+- No reverse proxy (NGINX/Traefik), orchestration, or cloud deployment is
+  included; those remain out of scope for the foundation phases.
+- No application source files were modified in this phase.
+
+---
+
+# Phase 1.11 Summary
+
+## Files Created
+
+- backend/app/observability/__init__.py
+- backend/app/observability/request_context.py
+- backend/app/observability/events.py
+- backend/app/observability/metrics.py
+- backend/app/observability/tracing.py
+- backend/app/middleware/observability.py
+
+## Files Modified
+
+- backend/app/middleware/registration.py
+- backend/app/middleware/__init__.py
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `RequestContext` is a Pydantic model with `request_id`, `timestamp`, and
+  `correlation_id` required and `trace_id`, `user_id`, and
+  `organization_id` defaulting to `None`; `model_dump()` reports the
+  optional fields as `None`.
+- `app/observability/events.py` defines the five `EventType` events
+  (`APPLICATION_STARTED`, `APPLICATION_STOPPED`, `REQUEST_RECEIVED`,
+  `REQUEST_COMPLETED`, `HEALTH_CHECKED`). No event is published anywhere.
+- `app/observability/metrics.py` declares `Counter`, `Gauge`, `Histogram`,
+  and `Timer` as `Protocol` interfaces; no Prometheus or OpenTelemetry
+  dependency was added.
+- `app/observability/tracing.py` declares `Span` and `Tracer` as `Protocol`
+  interfaces; no OpenTelemetry or Jaeger dependency was added.
+- `ObservabilityMiddleware` runs for every request, derives the request ID
+  from the request state (set by the request ID middleware), generates a
+  fresh `UUID4` correlation ID, and stores a `RequestContext` on
+  `request.state.context`. Runtime smoke tests confirm the context is
+  populated and the `trace_id`/`user_id`/`organization_id` fields default
+  to `None`.
+- `register_middlewares()` registers `ObservabilityMiddleware`; the
+  effective order is security headers, request ID, CORS, observability.
+- `ruff check` and `ruff format --check` pass across `backend/app`.
+- `mypy --strict` passes across `backend/app`.
+- A runtime smoke test (application factory, `TestClient`, health request)
+  succeeds and emits only the four lifecycle log lines; no request-context
+  event logging was added.
+- No authentication, metrics exporter, tracing backend, event bus, or new
+  HTTP endpoint was created.
 
 ---
 
@@ -1022,6 +1155,10 @@ feat(phase-1.8): add code quality infrastructure
 feat(phase-1.9): add testing infrastructure
 
 feat(phase-1.10): add docker development environment
+
+feat(phase-1.11): add observability foundation
+
+feat(phase-1.12): add docker production environment
 ```
 
 ---
@@ -1030,12 +1167,11 @@ feat(phase-1.10): add docker development environment
 
 Current phase is complete when:
 
-- A development Dockerfile exists.
-- A `docker-compose.yml` exists.
-- The backend service is configured.
-- Supporting services are configured.
+- The foundation phases (1.1–1.12) are reviewed for consistency.
+- Documentation and status reflect the completed foundation.
 - The project structure remains clean.
-- No production deployment, Kubernetes, or CI/CD has been implemented.
+- No authentication, database, AI, agents, or workflow engine has been
+  implemented.
 
 ---
 

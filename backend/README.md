@@ -20,7 +20,11 @@ MyPy strict type checking, and pre-commit hooks), and the Phase 1.9
 testing infrastructure (pytest, pytest-asyncio, coverage, and a reusable
 httpx-based test client), and the Phase 1.10 Docker development
 environment (a development image using uv, and a Docker Compose stack for
-the backend with PostgreSQL, Redis, and Qdrant).
+the backend with PostgreSQL, Redis, and Qdrant), and the Phase 1.11
+observability foundation (a request context object, event definitions, and
+the metrics and tracing interfaces), and the Phase 1.12 Docker production
+environment (a multi-stage Dockerfile with a minimal production runtime
+image and a production Docker Compose stack).
 
 ## Structure
 
@@ -59,7 +63,14 @@ backend/
 │   │   ├── cors.py            # CORS from application settings
 │   │   ├── request_id.py      # X-Request-ID generation
 │   │   ├── security_headers.py# Security response headers
+│   │   ├── observability.py   # Request context middleware
 │   │   └── registration.py    # Central middleware registration
+│   ├── observability/         # Observability primitives
+│   │   ├── __init__.py        # Observability package exports
+│   │   ├── request_context.py # Request-scoped context object
+│   │   ├── events.py          # Event definitions
+│   │   ├── metrics.py         # Metrics interfaces (Counter, Gauge, ...)
+│   │   └── tracing.py         # Tracing interfaces (Span, Tracer)
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -172,6 +183,81 @@ LOG_LEVEL=DEBUG
 
 Supported values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. An
 invalid value raises a `ValueError` at startup.
+
+## Observability
+
+Observability primitives live in `app/observability/`. This phase defines
+the request context object and the interfaces for metrics and tracing; no
+exporter or backend is wired in yet.
+
+### Request Context
+
+`RequestContext` in `app/observability/request_context.py` is the
+identifying metadata for a single request:
+
+| Field            | Type            | Description                                  |
+| ---------------- | --------------- | -------------------------------------------- |
+| `request_id`     | `str`           | Unique identifier for the request            |
+| `timestamp`      | `datetime`      | Time the request entered the application     |
+| `correlation_id` | `str`           | Identifier grouping related requests         |
+| `trace_id`       | `str | None`    | Trace ID once a tracing backend is wired in  |
+| `user_id`        | `str | None`    | Authenticated user, when available           |
+| `organization_id`| `str | None`    | Authenticated organization, when available   |
+
+`ObservabilityMiddleware` builds the context for every request and stores
+it on `request.state.context`. Route handlers and dependencies can read it
+through the request state:
+
+```python
+from starlette.requests import Request
+
+from app.observability.request_context import RequestContext
+
+
+@app.get("/example")
+def example(request: Request) -> dict:
+    context: RequestContext = request.state.context
+    return {"request_id": context.request_id}
+```
+
+The `trace_id`, `user_id`, and `organization_id` fields remain `None` until
+tracing and authentication are implemented.
+
+### Event Definitions
+
+`app/observability/events.py` defines the names of the application events
+as an `EventType` enumeration: `APPLICATION_STARTED`, `APPLICATION_STOPPED`,
+`REQUEST_RECEIVED`, `REQUEST_COMPLETED`, and `HEALTH_CHECKED`. The events
+are declared so producers and consumers agree on names before any publishing
+infrastructure exists; no event is emitted in this phase.
+
+### Future Metrics
+
+`app/observability/metrics.py` declares the interfaces for the metrics
+instruments as `Protocol`s:
+
+| Interface   | Methods                                  |
+| ----------- | ---------------------------------------- |
+| `Counter`   | `add(amount=1)`                          |
+| `Gauge`     | `set(value)`, `inc()`, `dec()`           |
+| `Histogram` | `observe(value)`                         |
+| `Timer`     | `time()` (context manager)               |
+
+No concrete implementation exists yet. A Prometheus or OpenTelemetry
+adapter will implement these protocols in a later phase.
+
+### Future Tracing
+
+`app/observability/tracing.py` declares the tracing interfaces as
+`Protocol`s:
+
+| Interface | Methods                                      |
+| --------- | -------------------------------------------- |
+| `Span`    | `set_attribute(key, value)`, `end()`         |
+| `Tracer`  | `start_span(name)`, `span(name)` (context manager) |
+
+No concrete implementation exists yet. An OpenTelemetry or Jaeger adapter
+will implement these protocols in a later phase.
 
 ## Dependency Injection
 
@@ -324,6 +410,7 @@ The effective request/response order (outermost first) is:
 1. Security headers
 2. Request ID
 3. CORS
+4. Observability
 
 ### Request IDs
 
@@ -334,6 +421,16 @@ The effective request/response order (outermost first) is:
 - Binds it to the structured log context as `request_id`, so every log
   event for the request carries it.
 - Echoes the same value back in the `X-Request-ID` response header.
+
+### Observability
+
+`ObservabilityMiddleware` in `app/middleware/observability.py` builds a
+`RequestContext` for every request and stores it on
+`request.state.context`. The context carries the request ID assigned by the
+request ID middleware, the time the request entered the application, and a
+fresh `UUID4` correlation ID. Future authentication and tracing will fill
+the `user_id`, `organization_id`, and `trace_id` fields. See
+[Observability](#observability-1) below.
 
 ### Security Headers
 
@@ -509,9 +606,12 @@ supporting services (PostgreSQL, Redis, Qdrant) run locally in containers.
 
 ### Files
 
-- `Dockerfile` (repository root) - a Python 3.12 development image using
-  uv. It installs runtime and development dependencies, runs uvicorn with
-  hot reload (`--reload`) as a non-root user, and exposes port `8000`.
+- `Dockerfile` (repository root) - a Python 3.12 multi-stage image with two
+  stages. The default `development` stage is the development image using
+  uv: it installs runtime and development dependencies, runs uvicorn with
+  hot reload (`--reload`) as a non-root user, and exposes port `8000`. The
+  `runtime` stage is the minimal production image (no hot reload) and is
+  selected by the production stack.
 - `docker/development/docker-compose.yml` - the development stack:
   `backend`, `postgres`, `redis`, and `qdrant` on a single bridge network
   with named volumes for persistent data.
@@ -586,6 +686,120 @@ Supporting services expose their default ports on the host: PostgreSQL
 Docker network the backend reaches them by service name (for example
 `postgres:5432`), so connection strings in `backend/.env` must use the
 service names once the database layer is implemented.
+
+## Docker Production
+
+A production-oriented Docker setup is included. It reuses the same root
+`Dockerfile` and `.dockerignore` as development but builds the minimal
+`runtime` stage and runs a separate Compose stack.
+
+### Files
+
+- `Dockerfile` (repository root) - the multi-stage image. The `runtime`
+  stage installs only the locked runtime dependencies (`uv sync --frozen
+  --no-dev`), copies the compiled virtual environment and the application
+  source, runs uvicorn (no hot reload) as a non-root user, and registers a
+  Docker `HEALTHCHECK` against `/api/v1/health`.
+- `docker/production/docker-compose.yml` - the production stack:
+  `backend`, `postgres`, `redis`, and `qdrant` on a dedicated `twib-prod`
+  bridge network with named volumes, restart policies, and health checks.
+- `.dockerignore` (repository root) - shared with the development build;
+  keeps the build context limited to the backend subtree.
+
+### Prerequisites
+
+- Docker 24+ with BuildKit (the `syntax=docker/dockerfile:1` directive
+  requires it)
+- Docker Compose 2+
+
+The backend reads its configuration from `backend/.env` through the
+existing settings system. In production, set `APP_ENV=production` and the
+infrastructure connection strings there:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+The production stack overrides `HOST`/`PORT` and forces `APP_ENV=production`
+(JSON logging) even if the local `.env` still says `development`.
+
+### Building the Production Image
+
+Build the minimal production image directly:
+
+```bash
+docker build --target runtime -t twib-backend:production ../..
+```
+
+The `runtime` stage is intentionally small: only the compiled virtual
+environment and the application source are copied into it, and it runs as
+the non-root `twib` user. Runtime dependencies are pinned through
+`uv.lock` (`--frozen`), so installs are reproducible.
+
+### Running the Production Stack
+
+```bash
+cd docker/production
+docker compose up -d
+```
+
+This builds the `runtime` backend image, starts all four services with
+`restart: unless-stopped`, and gates backend startup on healthy supporting
+services. The API is available at
+<http://localhost:8000/api/v1/health>.
+
+To rebuild after an application change:
+
+```bash
+docker compose build backend
+docker compose up -d
+```
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
+Named volumes keep PostgreSQL, Redis, and Qdrant data across restarts. To
+stop the stack and remove the data volumes too:
+
+```bash
+docker compose down -v
+```
+
+### Production Notes
+
+- Only the backend publishes a port (`8000:8000`). Supporting services are
+  reachable only inside the `twib-prod` network and are not exposed on the
+  host.
+- The backend container runs as the non-root `twib` user with no source
+  bind mounts; deploy by rebuilding the image.
+- The Docker `HEALTHCHECK` (image-level) and the compose health checks
+  report against `/api/v1/health` and the native readiness probes of the
+  supporting services.
+- The image uses a single uvicorn worker. Scale out by increasing
+  `--workers` (or replicas) once the workload requires it.
+- No reverse proxy, orchestration, or cloud deployment is included in this
+  phase.
+
+### Difference between Development and Production
+
+| Aspect                 | Development                               | Production                          |
+| ---------------------- | ----------------------------------------- | ----------------------------------- |
+| Dockerfile stage       | `development` (default)                   | `runtime` (`build.target: runtime`) |
+| Dependencies           | All groups (`uv sync --all-groups`)       | Runtime only (`uv sync --frozen --no-dev`) |
+| Hot reload             | Yes (`--reload`, bind mounts)             | No (image contains the source)      |
+| Source access          | Bind-mounted from the host                | Copied into the image               |
+| Docker HEALTHCHECK     | Compose-level health check                | Image `HEALTHCHECK` plus compose health checks |
+| Compose file           | `docker/development/docker-compose.yml`   | `docker/production/docker-compose.yml` |
+| Compose project name   | `twib`                                    | `twib-prod`                         |
+| Network                | `twib-dev` (bridge)                       | `twib-prod` (bridge)                |
+| Restart policy         | `unless-stopped` (supporting services)    | `unless-stopped` (all services)     |
+| Published ports        | Backend `8000`; postgres `5432`, redis `6379`, qdrant `6333`/`6334` | Backend `8000` only |
+| `APP_ENV`              | `development` (from `.env`)               | `production` (forced)               |
+| Log format             | Colorized console                         | JSON lines                          |
 
 ## Code Quality
 
@@ -760,12 +974,18 @@ deferred until those subsystems exist.
   error response without exposing tracebacks.
 - Middleware is registered once in `create_application()` through
   `register_middlewares()`. Every request receives a `UUID4` request ID,
-  security headers are applied to every response, and CORS reads origins
-  from settings.
-- Logging, dependency injection, exception handling, middleware, and the
-  API foundation (schemas, tags, response helpers, OpenAPI metadata) are
-  the cross-cutting infrastructure implemented so far. Authentication,
-  database, and business endpoints are intentionally deferred to later
-  phases.
+  security headers are applied to every response, CORS reads origins from
+  settings, and a `RequestContext` is built and exposed on
+  `request.state.context`.
+- Observability defines the request context object (`RequestContext`), the
+  event names, and the metrics and tracing interfaces in
+  `app/observability/`. No metrics or tracing backend is implemented in
+  this phase; adapters will be added in later phases.
+- Logging, dependency injection, exception handling, middleware, the API
+  foundation (schemas, tags, response helpers, OpenAPI metadata), and the
+  observability foundation (request context, event definitions, metrics and
+  tracing interfaces) are the cross-cutting infrastructure implemented so
+  far. Authentication, database, and business endpoints are intentionally
+  deferred to later phases.
 - Follow the project coding guidelines (PEP 8, type hints, Google-style
   docstrings). Do not add code outside the current phase.
