@@ -29,7 +29,9 @@ foundation (framework-independent base classes for entities, aggregates,
 value objects, domain events, and identities, plus the domain exception
 hierarchy), and the Phase 2.2 domain value objects (reusable, immutable,
 self-validating value objects for identifiers, emails, names, slugs,
-timestamps, URLs, versions, money, and metadata).
+timestamps, URLs, versions, money, and metadata), and the Phase 2.3 user
+domain (the User aggregate root built from the value objects, with user
+statuses, roles, domain events, and business-rule exceptions).
 
 ## Structure
 
@@ -83,18 +85,25 @@ backend/
 │   │   ├── aggregate.py       # AggregateRoot
 │   │   ├── value_object.py    # ValueObject
 │   │   ├── event.py           # DomainEvent
-│   │   ├── exceptions.py      # Domain exception hierarchy
-│   │   └── value_objects/     # Concrete domain value objects
-│   │       ├── __init__.py    # Public value object exports
-│   │       ├── id.py          # UuidIdentity
-│   │       ├── email.py       # Email
-│   │       ├── name.py        # Name
-│   │       ├── slug.py        # Slug
-│   │       ├── timestamp.py   # Timestamp
-│   │       ├── url.py         # Url
-│   │       ├── version.py     # Version
-│   │       ├── money.py       # Money
-│   │       └── metadata.py    # Metadata
+│   │   │   ├── exceptions.py      # Domain exception hierarchy
+│   │   ├── value_objects/     # Concrete domain value objects
+│   │   │   ├── __init__.py    # Public value object exports
+│   │   │   ├── id.py          # UuidIdentity
+│   │   │   ├── email.py       # Email
+│   │   │   ├── name.py        # Name
+│   │   │   ├── slug.py        # Slug
+│   │   │   ├── timestamp.py   # Timestamp
+│   │   │   ├── url.py         # Url
+│   │   │   ├── version.py     # Version
+│   │   │   ├── money.py       # Money
+│   │   │   └── metadata.py    # Metadata
+│   │   └── users/             # User domain aggregate
+│   │       ├── __init__.py    # Public user domain exports
+│   │       ├── user.py        # User aggregate root
+│   │       ├── role.py        # UserRole
+│   │       ├── status.py      # UserStatus
+│   │       ├── events.py      # User domain events
+│   │       └── exceptions.py  # User business-rule exceptions
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -301,6 +310,7 @@ can be reused by every future module (Clean Architecture).
 | `event.py`       | `DomainEvent`                                     |
 | `exceptions.py`  | Domain exception hierarchy                        |
 | `value_objects/` | Concrete, reusable value objects (package)        |
+| `users/`         | User aggregate, roles, statuses, events, exceptions |
 
 ### Entities
 
@@ -389,6 +399,103 @@ price = Money(Decimal("19.99"), "USD")
 Invalid values raise `InvalidValue` (a `DomainException` subclass) at
 construction instead of being silently accepted, so entities can never hold a
 malformed value object.
+
+### User Aggregate
+
+The core business entity of TWIB is the `User` aggregate root in
+`app/domain/users/`, imported from a single location:
+
+```python
+from app.domain.users import User, UserRole, UserStatus
+from app.domain.value_objects import Email, Name, UuidIdentity
+```
+
+`User` extends `AggregateRoot` and is built entirely from the Phase 2.2 value
+objects. Its state is exposed only through read-only properties (never as
+mutable attributes), and every change goes through a domain method that
+validates the operation, records a domain event, and bumps the version:
+
+| Property      | Type          | Meaning                                  |
+| ------------- | ------------- | ---------------------------------------- |
+| `user_id`     | `UuidIdentity`| Stable UUID identity of the user         |
+| `email`       | `Email`       | The user's email address                 |
+| `display_name`| `Name`        | The user's display name                  |
+| `created_at`  | `Timestamp`   | When the user was created (UTC)          |
+| `updated_at`  | `Timestamp`   | When the user was last changed (UTC)     |
+| `status`      | `UserStatus`  | Current lifecycle state                  |
+| `role`        | `UserRole`    | Role the user holds in the organization  |
+| `metadata`    | `Metadata`    | Key/value metadata map (immutable)       |
+| `version`     | `Version`     | Optimistic-locking version (auto-bumped) |
+
+```python
+user = User(
+    user_id=UuidIdentity.generate(),
+    email=Email("user@example.com"),
+    display_name=Name("Ada Lovelace"),
+)
+user.activate()
+user.change_display_name(Name("Grace Hopper"))
+for event in user.pull_domain_events():
+    pass  # publishing is done by an outer layer
+```
+
+The domain methods are `activate()`, `deactivate()`, `suspend()`, `restore()`,
+`delete()`, `change_display_name()`, `change_email()`, `update_metadata()`,
+and `increment_version()`. Every successful mutation refreshes `updated_at`
+and bumps `version` (one patch); call `increment_version()` directly only for
+out-of-band changes.
+
+#### Statuses
+
+`UserStatus` (in `app/domain/users/status.py`) is a `StrEnum`:
+
+| Status      | Value       | Meaning                                        |
+| ----------- | ----------- | ---------------------------------------------- |
+| `PENDING`   | `"pending"` | Created but not activated yet                  |
+| `ACTIVE`    | `"active"`  | Can use the platform                           |
+| `SUSPENDED` | `"suspended"`| Temporarily suspended                         |
+| `DISABLED`  | `"disabled"`| Deactivated; cannot sign in                    |
+| `DELETED`   | `"deleted"` | Deleted; terminal state                        |
+
+#### Roles
+
+`UserRole` (in `app/domain/users/role.py`) is a `StrEnum`. Only the roles are
+modelled; permissions are intentionally out of scope:
+
+| Role     | Value      |
+| -------- | ---------- |
+| `OWNER`  | `"owner"`  |
+| `ADMIN`  | `"admin"`  |
+| `MEMBER` | `"member"` |
+| `VIEWER` | `"viewer"` |
+
+#### User Domain Events
+
+`app/domain/users/events.py` defines the domain events, all subclasses of
+`DomainEvent` that carry the affected `user_id`:
+
+| Event              | Recorded by                                  |
+| ------------------ | -------------------------------------------- |
+| `UserCreated`      | construction of a new user                   |
+| `UserActivated`    | `activate()`                                 |
+| `UserSuspended`    | `suspend()`                                  |
+| `UserDeleted`      | `delete()`                                   |
+| `UserEmailChanged` | `change_email()` (carries new and previous)  |
+| `UserNameChanged`  | `change_display_name()` (carries new/previous) |
+
+The aggregate only records events; there is no event bus in this phase.
+
+#### User Business-Rule Exceptions
+
+`app/domain/users/exceptions.py` defines the user business-rule exceptions,
+all subclasses of `BusinessRuleViolation`:
+
+| Exception             | Raised when                                   |
+| --------------------- | --------------------------------------------- |
+| `InvalidUserState`    | An operation is invalid in the current state  |
+| `EmailAlreadyAssigned`| An email is already assigned to the user      |
+| `CannotSuspendOwner`  | An owner user is suspended                    |
+| `UserAlreadyActive`   | An already-active user is activated           |
 
 ### Domain Events
 
@@ -1155,6 +1262,12 @@ deferred until those subsystems exist.
   immutable, validate their value at construction, and compare by value. They
   are imported from `app.domain.value_objects` and raise `InvalidValue` on
   invalid input; no serialization or framework code lives here.
+- The user domain in `app/domain/users/` models the `User` aggregate root
+  (built from the value objects, with `UserStatus`/`UserRole` enums, user
+  domain events, and user business-rule exceptions). State is exposed only
+  through read-only properties; domain methods validate, record events, and
+  auto-bump the optimistic-locking version. No authentication, password,
+  database, repository, or API code exists in the domain layer.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

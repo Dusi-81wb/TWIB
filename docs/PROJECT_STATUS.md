@@ -29,7 +29,7 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        ████████░░░░░░░░░░░░  40%
+Domain Layer        ███████████░░░░░░░░░  55%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -48,9 +48,9 @@ Frontend            ░░░░░░░░░░░░░░░░░░░░
 Deployment          ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-> Domain Layer: Phases 2.1 (base classes, exceptions) and 2.2 (concrete
-> value objects) are complete; concrete entities and aggregates follow in
-> Phase 2.3+.
+> Domain Layer: Phases 2.1 (base classes, exceptions), 2.2 (concrete
+> value objects), and 2.3 (user domain) are complete; the organization domain
+> follows in Phase 2.4.
 
 ---
 
@@ -62,21 +62,21 @@ Sprint 2
 
 # Current Phase
 
-Phase 2.3 — User Domain
+Phase 2.4 — Organization Domain
 
 ---
 
 # Current Status
 
-🟢 In Progress
+🟢 Ready to Begin
 
 ---
 
 # Current Objective
 
-Implement the User domain entity on top of the Phase 2.1 domain foundation and
-the Phase 2.2 value objects (UUID identity, email, name), establishing the
-pattern concrete aggregates, repositories, and services follow.
+Implement the Organization domain aggregate on top of the domain foundation,
+the Phase 2.2 value objects, and the Phase 2.3 user domain, establishing the
+pattern concrete organizations, memberships, and roles follow.
 
 Do NOT implement
 
@@ -90,37 +90,40 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 2.2
+✅ Phase 2.3
 
 Completed
 
-- `backend/app/domain/value_objects/` package with ten files (`__init__.py`,
-  `id.py`, `email.py`, `name.py`, `slug.py`, `timestamp.py`, `url.py`,
-  `version.py`, `money.py`, `metadata.py`)
-- `UuidIdentity` immutable UUID identity with `generate()` and `parse()`
-- `Email`, `Name`, `Slug`, `Url`, and `Metadata` validated string value
-  objects with normalization
-- `Timestamp` timezone-aware UTC moment with `now()` and `parse()`
-- `Version` `major.minor.patch` semantic version with `parse()`
-- `Money` decimal amount with ISO 4217 currency validation
-- `InvalidValue` exception added to the domain exception hierarchy and
-  exported from the domain package
-- Every value object is immutable, self-validates at construction, compares
-  and hashes by value, and renders a meaningful string representation
-- The value objects are pure Python with no dataclasses, FastAPI, Pydantic,
-  or SQLAlchemy dependencies
-- `backend/README.md` documents the concrete value objects, the updated
-  domain structure, and the new `InvalidValue` exception
+- `backend/app/domain/users/` package with six files (`__init__.py`,
+  `user.py`, `role.py`, `status.py`, `events.py`, `exceptions.py`)
+- `User` aggregate root built entirely from the Phase 2.2 value objects
+  (`UuidIdentity`, `Email`, `Name`, `Timestamp`, `Metadata`, `Version`)
+- `UserStatus` `StrEnum` (pending, active, suspended, disabled, deleted)
+- `UserRole` `StrEnum` (owner, admin, member, viewer; no permissions yet)
+- User domain events (`UserCreated`, `UserActivated`, `UserSuspended`,
+  `UserDeleted`, `UserEmailChanged`, `UserNameChanged`)
+- User business-rule exceptions (`InvalidUserState`, `EmailAlreadyAssigned`,
+  `CannotSuspendOwner`, `UserAlreadyActive`)
+- Domain methods (`change_display_name`, `change_email`, `activate`,
+  `deactivate`, `suspend`, `restore`, `delete`, `update_metadata`,
+  `increment_version`) that validate, record events, refresh `updated_at`,
+  and auto-bump the optimistic-locking version
+- State is exposed only through read-only properties; no mutable attributes
+  are exposed directly
+- Pure Python with no FastAPI, Pydantic, SQLAlchemy, repositories,
+  authentication, password hashing, or JWT
+- `backend/README.md` documents the user aggregate, roles, statuses, domain
+  events, and business-rule exceptions
 
-(Previous: ✅ Phase 2.1)
+(Previous: ✅ Phase 2.2)
 
 ---
 
 # Next Milestone
 
-Phase 2.3
+Phase 2.4
 
-User Domain
+Organization Domain
 
 ---
 
@@ -257,18 +260,12 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/exceptions.py
-- backend/app/domain/__init__.py
-- backend/app/domain/value_objects/__init__.py (created)
-- backend/app/domain/value_objects/id.py (created)
-- backend/app/domain/value_objects/email.py (created)
-- backend/app/domain/value_objects/name.py (created)
-- backend/app/domain/value_objects/slug.py (created)
-- backend/app/domain/value_objects/timestamp.py (created)
-- backend/app/domain/value_objects/url.py (created)
-- backend/app/domain/value_objects/version.py (created)
-- backend/app/domain/value_objects/money.py (created)
-- backend/app/domain/value_objects/metadata.py (created)
+- backend/app/domain/users/__init__.py (created)
+- backend/app/domain/users/user.py (created)
+- backend/app/domain/users/role.py (created)
+- backend/app/domain/users/status.py (created)
+- backend/app/domain/users/events.py (created)
+- backend/app/domain/users/exceptions.py (created)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -424,9 +421,24 @@ _Not committed yet_
 
 ## Phase 2.3
 
-- [ ] User domain entity using `UuidIdentity`, `Email`, and `Name`
-- [ ] User domain events and invariants
-- [ ] README documentation for the user domain
+- [x] User domain package (`backend/app/domain/users/`)
+- [x] `User` aggregate root built from the Phase 2.2 value objects
+- [x] `UserStatus` enum (pending, active, suspended, disabled, deleted)
+- [x] `UserRole` enum (owner, admin, member, viewer)
+- [x] User domain events (created, activated, suspended, deleted, email/name changed)
+- [x] User business-rule exceptions
+- [x] Domain methods with validation, event recording, and version bumping
+- [x] Read-only property exposure (no mutable attributes)
+- [x] Pure Python (no FastAPI, Pydantic, SQLAlchemy, repositories, auth)
+- [x] README documentation for the user aggregate
+
+## Phase 2.4
+
+- [ ] Organization domain package (`backend/app/domain/organizations/`)
+- [ ] Organization aggregate root
+- [ ] Memberships and organization roles
+- [ ] Organization domain events and invariants
+- [ ] README documentation for the organization domain
 
 ---
 
@@ -570,11 +582,18 @@ Completed
 - Phase 2.2 Value Objects (UUID identity, email, name, slug, timestamp, URL,
   version, money, metadata)
 
+Session 17
+
+Completed
+
+- Phase 2.3 User Domain (User aggregate root, user statuses, roles, domain
+  events, business-rule exceptions)
+
 Next Session
 
-Phase 2.3
+Phase 2.4
 
-User Domain
+Organization Domain
 
 ---
 
@@ -767,6 +786,108 @@ None
   so they can be instantiated directly; this keeps ruff B024 clean and follows
   the existing config-level exemptions. Subclasses supply the identity or
   payload.
+
+---
+
+# Phase 2.3 Summary
+
+## Files Created
+
+- backend/app/domain/users/__init__.py
+- backend/app/domain/users/user.py
+- backend/app/domain/users/role.py
+- backend/app/domain/users/status.py
+- backend/app/domain/users/events.py
+- backend/app/domain/users/exceptions.py
+
+## Files Modified
+
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `User` extends `AggregateRoot[uuid.UUID]` and is built entirely from the
+  Phase 2.2 value objects (`UuidIdentity`, `Email`, `Name`, `Timestamp`,
+  `Metadata`, `Version`) plus the `UserStatus`/`UserRole` enums; state is
+  exposed only through read-only properties.
+- Construction records a `UserCreated` event; `pull_domain_events()` returns
+  events in order and clears the record.
+- `change_display_name()` and `change_email()` validate, record
+  `UserNameChanged`/`UserEmailChanged` (carrying new and previous values), and
+  are no-ops when the value is unchanged.
+- `change_email()` raises `EmailAlreadyAssigned` when the new email equals the
+  email already assigned to the user.
+- `activate()` raises `UserAlreadyActive` when already active; `deactivate()`,
+  `suspend()`, `restore()`, and `delete()` enforce their state transitions and
+  raise `InvalidUserState` on invalid ones.
+- `suspend()` raises `CannotSuspendOwner` for users with the OWNER role.
+- `delete()` is terminal: every later mutation raises `InvalidUserState`.
+- Every successful mutation refreshes `updated_at` and bumps `version` by one
+  patch; `increment_version()` exposes an explicit bump.
+- `metadata` returns the immutable `Metadata` value object (a copy of the
+  internal map), so it cannot be mutated externally.
+- `User` equality and hashing follow the `Entity` contract (same type and
+  identity), so two aggregates wrapping the same UUID are equal.
+- `UserStatus` and `UserRole` are `StrEnum`s with the documented members.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain`.
+- A runtime smoke test (creation, read-only properties, every domain method,
+  each event, every exception path, version bumping, and identity equality)
+  succeeds.
+- No authentication, password hashing, JWT, database model, repository, API
+  route, or external dependency was added.
+
+## Architectural Decisions
+
+- `User` subclasses `AggregateRoot[uuid.UUID]` and bridges to the base's
+  identity contract with the generic `Identity(user_id.value)`; the canonical
+  identifier exposed to callers is the `UuidIdentity` value object via the
+  `user_id` property. This reuses the Phase 2.1 aggregate machinery (event
+  recording, identity equality) without modifying the Phase 2.2 identity.
+- The aggregate's state lives in private fields and is exposed only through
+  read-only properties; mutability happens exclusively through domain methods
+  that enforce business rules, so no mutable attribute is exposed directly.
+- Optimistic locking is modelled as an auto-bumping `Version`: every
+  successful domain method calls `_touch()` (refresh `updated_at`, bump the
+  version), and `increment_version()` is provided for explicit out-of-band
+  bumps.
+- `UserStatus` and `UserRole` are `StrEnum`s (per the Phase 1.8 UP042
+  convention and the coding guidelines enum pattern) rather than value-object
+  wrappers; they are immutable and string-comparable by construction.
+- User domain exceptions subclass `BusinessRuleViolation` (a
+  `DomainException`), matching their semantics as enterprise business-rule
+  violations and keeping them framework-independent.
+- User events subclass `DomainEvent` and carry the affected `user_id` plus the
+  new and previous values for the change events, so consumers have everything
+  they need without querying state.
+
+## Suggestions (Not Implemented)
+
+- No unit tests were added in this phase (running the pytest tooling is out of
+  scope per the phase rules). Phase 2.4 should add `backend/tests/domain/`
+  unit tests covering the value objects and the user aggregate.
+- `deactivate()` and `restore()` do not emit domain events (the phase
+  specified exactly six events). A future phase can add `UserDeactivated` and
+  `UserRestored` events for full auditability.
+- `EmailAlreadyAssigned` is currently raised only when the new email equals
+  the email already assigned to this user. Cross-user duplicate detection
+  requires the repository/application service and will land with the database
+  phase.
+- `update_metadata()` replaces the whole metadata map rather than merging.
+  Per-key merge/removal APIs can be added once persistence exists.
+- No permissions are modelled for `UserRole`; a future RBAC phase will attach
+  permissions to roles.
+- The `User` constructor accepts optional `created_at`, `updated_at`,
+  `status`, `role`, `metadata`, and `version` so outer layers can reconstruct
+  aggregates from storage; there is no persistence code yet.
+- `folder_structure.md` still lists `app/models/` as the future home of
+  domain models; the implemented home is `app/domain/`. The docs can be
+  aligned when the roadmap is next updated.
 
 ---
 
