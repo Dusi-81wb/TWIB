@@ -24,7 +24,10 @@ the backend with PostgreSQL, Redis, and Qdrant), and the Phase 1.11
 observability foundation (a request context object, event definitions, and
 the metrics and tracing interfaces), and the Phase 1.12 Docker production
 environment (a multi-stage Dockerfile with a minimal production runtime
-image and a production Docker Compose stack).
+image and a production Docker Compose stack), and the Phase 2.1 domain
+foundation (framework-independent base classes for entities, aggregates,
+value objects, domain events, and identities, plus the domain exception
+hierarchy).
 
 ## Structure
 
@@ -71,6 +74,14 @@ backend/
 │   │   ├── events.py          # Event definitions
 │   │   ├── metrics.py         # Metrics interfaces (Counter, Gauge, ...)
 │   │   └── tracing.py         # Tracing interfaces (Span, Tracer)
+│   ├── domain/                # Domain layer (pure Python, no frameworks)
+│   │   ├── __init__.py        # Public domain exports
+│   │   ├── base.py            # Aggregated abstract base classes
+│   │   ├── entity.py          # Identity[T], Entity
+│   │   ├── aggregate.py       # AggregateRoot
+│   │   ├── value_object.py    # ValueObject
+│   │   ├── event.py           # DomainEvent
+│   │   └── exceptions.py      # Domain exception hierarchy
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -258,6 +269,100 @@ adapter will implement these protocols in a later phase.
 
 No concrete implementation exists yet. An OpenTelemetry or Jaeger adapter
 will implement these protocols in a later phase.
+
+## Domain Layer
+
+The domain layer lives in `app/domain/` and contains the enterprise business
+rules of the platform. It is **pure Python**: it imports no FastAPI, Pydantic,
+SQLAlchemy, or any other framework, so it never depends on an outer layer and
+can be reused by every future module (Clean Architecture).
+
+### Files
+
+| File             | Contents                                          |
+| ---------------- | ------------------------------------------------- |
+| `base.py`        | Aggregates the abstract base classes              |
+| `entity.py`      | `Identity[T]`, `Entity`                           |
+| `aggregate.py`   | `AggregateRoot`                                   |
+| `value_object.py`| `ValueObject`                                     |
+| `event.py`       | `DomainEvent`                                     |
+| `exceptions.py`  | Domain exception hierarchy                        |
+
+### Entities
+
+An entity is a domain object defined by its identity rather than its state.
+`Entity` (in `app/domain/entity.py`) stores a stable `Identity[T]` and
+implements equality and hashing based on the type and identity, so two
+entities with the same identity are equal even if their state differs:
+
+```python
+class User(Entity[uuid.UUID]):
+    def __init__(self, id_: Identity[uuid.UUID], name: str) -> None:
+        super().__init__(id_)
+        self.name = name
+```
+
+`Identity[T]` is an immutable value wrapper around the underlying identifier
+(UUID, string, or integer) and is compared by value.
+
+### Aggregates
+
+`AggregateRoot` (in `app/domain/aggregate.py`) is an entity that acts as the
+consistency boundary for a cluster of entities and value objects. While its
+business rules are applied it records `DomainEvent` instances with
+`record_event(event)` and hands them to the outside world exactly once with
+`pull_domain_events()`:
+
+```python
+order = Order(Identity(order_id))
+order.mark_paid()
+for event in order.pull_domain_events():
+    event_bus.publish(event)  # done by an outer layer
+```
+
+### Value Objects
+
+`ValueObject` (in `app/domain/value_object.py`) is an immutable object defined
+entirely by its attributes. Equality, hashing, and representation are compared
+by value, so two value objects with the same attributes are interchangeable.
+Subclasses are declared as frozen dataclasses with `eq=False`:
+
+```python
+@dataclass(frozen=True, eq=False)
+class Email(ValueObject):
+    value: str
+```
+
+### Domain Events
+
+`DomainEvent` (in `app/domain/event.py`) is an immutable record that something
+happened in the domain. Every occurrence carries a unique `event_id`, a UTC
+`occurred_at` timestamp, and a derived `event_name`. Base fields are
+keyword-only, so concrete events declare their payload fields without defaults:
+
+```python
+@dataclass(frozen=True, eq=False, repr=False)
+class WorkflowCreated(DomainEvent):
+    workflow_id: Identity[uuid.UUID]
+```
+
+The domain layer only *records* events. Publishing, emails, notifications, and
+analytics belong to outer layers.
+
+### Domain Exceptions
+
+`app/domain/exceptions.py` defines the framework-independent domain exception
+hierarchy:
+
+| Exception              | Meaning                                             |
+| ---------------------- | --------------------------------------------------- |
+| `DomainException`      | Base class for all domain errors (`message`, `details`) |
+| `BusinessRuleViolation`| An enterprise business rule or invariant was broken |
+| `EntityNotFound`       | A requested entity does not exist                   |
+| `InvalidOperation`     | An operation is not valid in the current state      |
+
+Outer layers translate these into their own error contract (for example the
+FastAPI `TWIBException` hierarchy in `app/core/exceptions.py`).
 
 ## Dependency Injection
 
@@ -981,6 +1086,12 @@ deferred until those subsystems exist.
   event names, and the metrics and tracing interfaces in
   `app/observability/`. No metrics or tracing backend is implemented in
   this phase; adapters will be added in later phases.
+- The domain layer in `app/domain/` defines the framework-independent base
+  classes (`Entity`, `AggregateRoot`, `ValueObject`, `DomainEvent`,
+  `Identity`) and the domain exception hierarchy (`DomainException`,
+  `BusinessRuleViolation`, `EntityNotFound`, `InvalidOperation`). It depends
+  only on the Python standard library and is consumed by outer layers
+  (services, repositories, API) in later phases.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

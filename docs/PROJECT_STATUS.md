@@ -29,6 +29,8 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
+Domain Layer        █████░░░░░░░░░░░░░░░  25%
+
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
 Database            ░░░░░░░░░░░░░░░░░░░░   0%
@@ -46,17 +48,20 @@ Frontend            ░░░░░░░░░░░░░░░░░░░░
 Deployment          ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
+> Domain Layer: Phase 2.1 (base classes, exceptions) is complete; concrete
+> value objects, entities, and aggregates follow in Phase 2.2+.
+
 ---
 
 # Current Sprint
 
-Sprint 1
+Sprint 2
 
 ---
 
 # Current Phase
 
-Phase 1.13 — Foundation Review
+Phase 2.2 — Value Objects
 
 ---
 
@@ -68,51 +73,55 @@ Phase 1.13 — Foundation Review
 
 # Current Objective
 
-Review the foundation phases (1.1–1.12) for consistency, correctness, and
-readiness before the first feature phase.
+Implement the concrete value objects that model the platform's core domain
+(identifiers, emails, statuses, currency, and other immutable concepts) on
+top of the Phase 2.1 domain foundation.
 
 Do NOT implement
 
 - Authentication
 - Database
-- AI
-- Agents
-- Workflow Engine
+- FastAPI routes
+- Repositories
+- ORM
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 1.12
+✅ Phase 2.1
 
 Completed
 
-- `Dockerfile` (repository root): upgraded to a multi-stage build with a
-  `runtime` production stage and a default `development` stage
-- `docker/production/docker-compose.yml`: production stack with `backend`,
-  `postgres`, `redis`, and `qdrant` on a dedicated `twib-prod` network
-- `runtime` stage installs only locked runtime dependencies (`uv sync
-  --frozen --no-dev`), copies the compiled virtual environment and the
-  application source, runs as the non-root `twib` user, and registers a
-  Docker `HEALTHCHECK` against `/api/v1/health`
-- The production stack builds `target: runtime`, forces `APP_ENV=production`,
-  uses named volumes, restart policies, health checks, and no bind mounts
-  or hot reload
-- No Kubernetes, Helm, Terraform, GitHub Actions, NGINX, Traefik, cloud
-  deployment, monitoring, observability, or application changes were made
-- `backend/README.md` documents building the production image, running the
-  production stack, production notes, and the difference between the
-  development and production setups
+- `backend/app/domain/` package with seven files (`__init__.py`, `base.py`,
+  `entity.py`, `aggregate.py`, `value_object.py`, `event.py`,
+  `exceptions.py`)
+- `Identity[T]` immutable value type wrapping an entity identifier (UUID,
+  string, or integer) with value-based equality, hashing, and immutability
+- `Entity` base class with identity-based equality and hashing (entities are
+  equal when their type and identity match, regardless of state)
+- `AggregateRoot` base class that records `DomainEvent` instances during
+  operations and exposes them exactly once via `pull_domain_events()`
+- `ValueObject` base class providing value-based equality, hashing, and
+  representation for immutable dataclass subclasses
+- `DomainEvent` base class (keyword-only `event_id` and UTC `occurred_at`,
+  derived `event_name`) that concrete events extend with their payload
+- Domain exception hierarchy: `DomainException`, `BusinessRuleViolation`,
+  `EntityNotFound`, `InvalidOperation`
+- The domain layer is pure Python with no framework dependencies
+  (no FastAPI, Pydantic, SQLAlchemy), preserving Clean Architecture
+- `backend/README.md` documents the domain layer, entities, aggregates,
+  value objects, and domain events
 
-(Previous: ✅ Phase 1.11 — Observability Foundation)
+(Previous: ✅ Phase 1.13 — Foundation Review)
 
 ---
 
 # Next Milestone
 
-Phase 1.13
+Phase 2.2
 
-Foundation Review
+Value Objects
 
 ---
 
@@ -249,13 +258,14 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- docs/adr/0008-backend-package-layout.md (created)
-- docs/adr/0009-authentication-hybrid.md (created)
-- docs/folder_structure.md
-- docs/coding_guidelines.md
-- docs/development_workflow.md
-- docs/INDEX.md
-- docs/architecture.md
+- backend/app/domain/__init__.py (created)
+- backend/app/domain/base.py (created)
+- backend/app/domain/entity.py (created)
+- backend/app/domain/aggregate.py (created)
+- backend/app/domain/value_object.py (created)
+- backend/app/domain/event.py (created)
+- backend/app/domain/exceptions.py (created)
+- backend/README.md
 - docs/PROJECT_STATUS.md
 
 # Pending Tasks
@@ -378,6 +388,18 @@ _Not committed yet_
 - [x] ADR-0008 backend package layout
 - [x] ADR-0009 authentication (hybrid) decision
 - [x] Sync folder_structure.md / coding_guidelines.md / development_workflow.md
+
+## Phase 2.1
+
+- [x] Domain package (`backend/app/domain/`)
+- [x] `Identity[T]` value type
+- [x] `Entity` base class
+- [x] `AggregateRoot` base class
+- [x] `ValueObject` base class
+- [x] `DomainEvent` base class
+- [x] Domain exception hierarchy
+- [x] Framework-independent (pure Python, no FastAPI/Pydantic/SQLAlchemy)
+- [x] README documentation for the domain layer
 
 ---
 
@@ -507,11 +529,18 @@ Completed
 
 - Phase 1.13 Foundation Review (audit, ADR-0008, ADR-0009, doc sync)
 
+Session 15
+
+Completed
+
+- Phase 2.1 Domain Foundation (entities, aggregates, value objects, domain
+  events, identities, domain exceptions)
+
 Next Session
 
-Phase 2
+Phase 2.2
 
-Authentication (per ADR-0009)
+Value Objects
 
 ---
 
@@ -622,6 +651,88 @@ Authentication (per ADR-0009)
   no coverage fail-under, and Makefile/scripts/.github do not exist yet.
 - `roadmap.md` Phase 1 status and the roadmap/TECH_STACK authentication
   wording can be aligned to ADR-0009 when the roadmap is next updated.
+
+---
+
+# Phase 2.1 Summary
+
+## Files Created
+
+- backend/app/domain/__init__.py
+- backend/app/domain/base.py
+- backend/app/domain/entity.py
+- backend/app/domain/aggregate.py
+- backend/app/domain/value_object.py
+- backend/app/domain/event.py
+- backend/app/domain/exceptions.py
+
+## Files Modified
+
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `Identity[T]` is an immutable value wrapper around an entity identifier
+  (UUID, string, or integer); it is compared and hashed by value, cannot be
+  mutated after construction, and renders as the wrapped value.
+- `Entity` compares and hashes by type and identity, so two entities with the
+  same identity are equal regardless of their state; a runtime smoke test
+  confirmed identity-based equality, hashing, and entity-state mutation.
+- `AggregateRoot` records `DomainEvent` instances through `record_event()` and
+  returns them exactly once through `pull_domain_events()`; the smoke test
+  confirmed events are returned in order and the record clears.
+- `ValueObject` provides value-based equality, hashing, and representation;
+  frozen dataclass subclasses inherit them (`@dataclass(frozen=True, eq=False)`).
+- `DomainEvent` uses keyword-only `event_id` (UUID4) and `occurred_at` (UTC)
+  defaults plus a derived `event_name`; concrete events add payload fields
+  without defaults.
+- Domain exceptions (`DomainException`, `BusinessRuleViolation`,
+  `EntityNotFound`, `InvalidOperation`) form a framework-independent hierarchy
+  carrying `message` and optional `details`.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain`.
+- A runtime smoke test (imports, identity immutability, entity equality,
+  aggregate event recording, value-object equality, domain-event construction,
+  exception hierarchy) succeeds.
+- No authentication, database, repository, FastAPI route, Pydantic model, ORM,
+  or external dependency was added.
+
+## Architectural Decisions
+
+- The domain layer lives in `backend/app/domain/` per ADR-0008 (new modules
+  are subpackages of `app/`). The canonical base classes are defined in their
+  concept modules (`entity.py`, `aggregate.py`, `value_object.py`, `event.py`);
+  `base.py` aggregates them as a single import surface and `__init__.py`
+  exports the public domain API.
+- The domain layer is pure Python: it imports only the standard library. It
+  does not reuse `app.core.exceptions` (which is FastAPI-aware) but defines
+  its own exception hierarchy; outer layers translate domain exceptions into
+  the HTTP-aware `TWIBException` contract.
+- Classes follow the Phase 1.8 PEP 695 type-parameter convention
+  (`Entity[EntityID: uuid.UUID | str | int]`); constructor parameters that
+  would shadow the `id` builtin are named `id_`.
+- `DomainEvent` base fields are keyword-only so concrete event subclasses can
+  declare required payload fields without defaults (no dataclass field-order
+  error).
+
+## Suggestions (Not Implemented)
+
+- `folder_structure.md` still lists `app/models/` as the future home of
+  domain models; the implemented home is `app/domain/`. ADR-0008 permits new
+  subpackages under `app/`, so no ADR was required, but the docs can be
+  aligned when the roadmap is next updated.
+- No unit tests were added in this phase (the phase scope was the domain
+  foundation only, and running the test tooling was out of scope). Phase 2.2
+  should add `backend/tests/domain/` unit tests for the base classes.
+- `ValueObject` and `Entity` are not ABCs (they declare no abstract methods),
+  so they can be instantiated directly; this keeps ruff B024 clean and follows
+  the existing config-level exemptions. Subclasses supply the identity or
+  payload.
 
 ---
 
