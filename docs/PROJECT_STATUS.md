@@ -29,7 +29,7 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        █████░░░░░░░░░░░░░░░  25%
+Domain Layer        ████████░░░░░░░░░░░░  40%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -48,8 +48,9 @@ Frontend            ░░░░░░░░░░░░░░░░░░░░
 Deployment          ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-> Domain Layer: Phase 2.1 (base classes, exceptions) is complete; concrete
-> value objects, entities, and aggregates follow in Phase 2.2+.
+> Domain Layer: Phases 2.1 (base classes, exceptions) and 2.2 (concrete
+> value objects) are complete; concrete entities and aggregates follow in
+> Phase 2.3+.
 
 ---
 
@@ -61,21 +62,21 @@ Sprint 2
 
 # Current Phase
 
-Phase 2.2 — Value Objects
+Phase 2.3 — User Domain
 
 ---
 
 # Current Status
 
-🟢 Ready to Begin
+🟢 In Progress
 
 ---
 
 # Current Objective
 
-Implement the concrete value objects that model the platform's core domain
-(identifiers, emails, statuses, currency, and other immutable concepts) on
-top of the Phase 2.1 domain foundation.
+Implement the User domain entity on top of the Phase 2.1 domain foundation and
+the Phase 2.2 value objects (UUID identity, email, name), establishing the
+pattern concrete aggregates, repositories, and services follow.
 
 Do NOT implement
 
@@ -89,39 +90,37 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 2.1
+✅ Phase 2.2
 
 Completed
 
-- `backend/app/domain/` package with seven files (`__init__.py`, `base.py`,
-  `entity.py`, `aggregate.py`, `value_object.py`, `event.py`,
-  `exceptions.py`)
-- `Identity[T]` immutable value type wrapping an entity identifier (UUID,
-  string, or integer) with value-based equality, hashing, and immutability
-- `Entity` base class with identity-based equality and hashing (entities are
-  equal when their type and identity match, regardless of state)
-- `AggregateRoot` base class that records `DomainEvent` instances during
-  operations and exposes them exactly once via `pull_domain_events()`
-- `ValueObject` base class providing value-based equality, hashing, and
-  representation for immutable dataclass subclasses
-- `DomainEvent` base class (keyword-only `event_id` and UTC `occurred_at`,
-  derived `event_name`) that concrete events extend with their payload
-- Domain exception hierarchy: `DomainException`, `BusinessRuleViolation`,
-  `EntityNotFound`, `InvalidOperation`
-- The domain layer is pure Python with no framework dependencies
-  (no FastAPI, Pydantic, SQLAlchemy), preserving Clean Architecture
-- `backend/README.md` documents the domain layer, entities, aggregates,
-  value objects, and domain events
+- `backend/app/domain/value_objects/` package with ten files (`__init__.py`,
+  `id.py`, `email.py`, `name.py`, `slug.py`, `timestamp.py`, `url.py`,
+  `version.py`, `money.py`, `metadata.py`)
+- `UuidIdentity` immutable UUID identity with `generate()` and `parse()`
+- `Email`, `Name`, `Slug`, `Url`, and `Metadata` validated string value
+  objects with normalization
+- `Timestamp` timezone-aware UTC moment with `now()` and `parse()`
+- `Version` `major.minor.patch` semantic version with `parse()`
+- `Money` decimal amount with ISO 4217 currency validation
+- `InvalidValue` exception added to the domain exception hierarchy and
+  exported from the domain package
+- Every value object is immutable, self-validates at construction, compares
+  and hashes by value, and renders a meaningful string representation
+- The value objects are pure Python with no dataclasses, FastAPI, Pydantic,
+  or SQLAlchemy dependencies
+- `backend/README.md` documents the concrete value objects, the updated
+  domain structure, and the new `InvalidValue` exception
 
-(Previous: ✅ Phase 1.13 — Foundation Review)
+(Previous: ✅ Phase 2.1)
 
 ---
 
 # Next Milestone
 
-Phase 2.2
+Phase 2.3
 
-Value Objects
+User Domain
 
 ---
 
@@ -258,13 +257,18 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/__init__.py (created)
-- backend/app/domain/base.py (created)
-- backend/app/domain/entity.py (created)
-- backend/app/domain/aggregate.py (created)
-- backend/app/domain/value_object.py (created)
-- backend/app/domain/event.py (created)
-- backend/app/domain/exceptions.py (created)
+- backend/app/domain/exceptions.py
+- backend/app/domain/__init__.py
+- backend/app/domain/value_objects/__init__.py (created)
+- backend/app/domain/value_objects/id.py (created)
+- backend/app/domain/value_objects/email.py (created)
+- backend/app/domain/value_objects/name.py (created)
+- backend/app/domain/value_objects/slug.py (created)
+- backend/app/domain/value_objects/timestamp.py (created)
+- backend/app/domain/value_objects/url.py (created)
+- backend/app/domain/value_objects/version.py (created)
+- backend/app/domain/value_objects/money.py (created)
+- backend/app/domain/value_objects/metadata.py (created)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -401,6 +405,29 @@ _Not committed yet_
 - [x] Framework-independent (pure Python, no FastAPI/Pydantic/SQLAlchemy)
 - [x] README documentation for the domain layer
 
+## Phase 2.2
+
+- [x] Value objects package (`backend/app/domain/value_objects/`)
+- [x] `UuidIdentity` (generate/parse)
+- [x] `Email`
+- [x] `Name`
+- [x] `Slug`
+- [x] `Timestamp` (now/parse)
+- [x] `Url`
+- [x] `Version` (parse)
+- [x] `Money`
+- [x] `Metadata`
+- [x] `InvalidValue` exception added to the domain hierarchy
+- [x] Immutable, self-validating, value-comparable, meaningful string repr
+- [x] Pure Python (no dataclasses, FastAPI, Pydantic, SQLAlchemy)
+- [x] README documentation for the concrete value objects
+
+## Phase 2.3
+
+- [ ] User domain entity using `UuidIdentity`, `Email`, and `Name`
+- [ ] User domain events and invariants
+- [ ] README documentation for the user domain
+
 ---
 
 # Known Issues
@@ -536,11 +563,18 @@ Completed
 - Phase 2.1 Domain Foundation (entities, aggregates, value objects, domain
   events, identities, domain exceptions)
 
+Session 16
+
+Completed
+
+- Phase 2.2 Value Objects (UUID identity, email, name, slug, timestamp, URL,
+  version, money, metadata)
+
 Next Session
 
-Phase 2.2
+Phase 2.3
 
-Value Objects
+User Domain
 
 ---
 
@@ -733,6 +767,118 @@ None
   so they can be instantiated directly; this keeps ruff B024 clean and follows
   the existing config-level exemptions. Subclasses supply the identity or
   payload.
+
+---
+
+# Phase 2.2 Summary
+
+## Files Created
+
+- backend/app/domain/value_objects/__init__.py
+- backend/app/domain/value_objects/id.py
+- backend/app/domain/value_objects/email.py
+- backend/app/domain/value_objects/name.py
+- backend/app/domain/value_objects/slug.py
+- backend/app/domain/value_objects/timestamp.py
+- backend/app/domain/value_objects/url.py
+- backend/app/domain/value_objects/version.py
+- backend/app/domain/value_objects/money.py
+- backend/app/domain/value_objects/metadata.py
+
+## Files Modified
+
+- backend/app/domain/exceptions.py (added `InvalidValue`)
+- backend/app/domain/__init__.py (exported `InvalidValue`)
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `UuidIdentity` wraps a UUID4, generates a fresh identity with `generate()`,
+  parses the canonical string form with `parse()`, compares and hashes by
+  value, and is immutable; invalid UUID strings raise `InvalidValue`.
+- `Email` normalizes to lowercase and trims surrounding whitespace; empty and
+  malformed addresses raise `InvalidValue`; equality and hashing are by value.
+- `Name` trims the value, rejects empty names, and enforces a 120-character
+  maximum length.
+- `Slug` normalizes to lowercase and enforces the strict `a-z0-9` plus single
+  hyphen pattern (no leading/trailing/repeated hyphens, no spaces).
+- `Timestamp` requires a timezone-aware moment, normalizes to UTC, and offers
+  `now()` and `parse()` (ISO 8601); naive moments raise `InvalidValue`.
+- `Url` accepts only absolute `http`/`https` URLs with a host; unsupported
+  schemes and missing hosts raise `InvalidValue`.
+- `Version` stores non-negative `major.minor.patch` components and parses the
+  dotted string form; negative components and malformed strings raise
+  `InvalidValue`.
+- `Money` stores a `Decimal` amount (int/str parsed with `Decimal`) and a
+  normalized ISO 4217 currency code (three uppercase letters); unparseable
+  amounts and invalid currencies raise `InvalidValue`.
+- `Metadata` stores an immutable string key/value map; the mapping is copied
+  at construction and `value` returns a fresh copy, so the stored data can
+  never be mutated from outside.
+- All value objects raise `InvalidValue` (a `DomainException` subclass) on
+  invalid input, block mutation after construction, and compare and hash by
+  value.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain`.
+- A runtime smoke test (generation, parsing, normalization, validation,
+  equality, hashing, immutability, and `InvalidValue` behaviour for all nine
+  value objects) succeeds.
+- No authentication, database, repository, FastAPI route, Pydantic model,
+  ORM, or external dependency was added.
+
+## Architectural Decisions
+
+- Concrete value objects live in `backend/app/domain/value_objects/` as a
+  subpackage of the domain layer (per ADR-0008) and are imported from
+  `app.domain.value_objects`. `app/domain/__init__.py` keeps exporting only
+  the base classes and exceptions; value objects are imported from their own
+  package to keep the public domain surface focused.
+- The concrete value objects do not use dataclasses (unlike the `ValueObject`
+  base-class pattern documented in Phase 2.1). Immutability is enforced by
+  overriding `__setattr__` to reject assignments after construction, and
+  instance attributes are declared with annotations so `mypy --strict` can
+  verify them.
+- Scalar value objects subclass the Phase 2.1 `ValueObject` base class, which
+  supplies value-based equality, hashing, and representation. `UuidIdentity`
+  is a standalone value type (modelled on the generic `Identity` in
+  `entity.py`) so it does not compare equal to a generic `Identity` wrapping
+  the same UUID.
+- Value objects accept and normalize `str` input (`parse`/class methods), so
+  outer layers can safely reconstruct them from storage and requests without
+  an ORM.
+- The domain exception hierarchy gained `InvalidValue`, the dedicated
+  exception for malformed value-object input; the Phase 2.1 exceptions remain
+  unchanged.
+
+## Suggestions (Not Implemented)
+
+- No unit tests were added in this phase (running the pytest tooling is out
+  of scope per the phase rules). Phase 2.3 should add
+  `backend/tests/domain/` unit tests covering the value objects and the user
+  entity.
+- `Version` has no ordering operators (`<`, `<=`, `>`, `>=`). They are
+  semantically meaningful for versions but were left out to keep the phase
+  focused on value semantics and validation; add them when version ordering
+  is actually needed.
+- `Money` has no arithmetic operators or currency conversion (no `__add__`,
+  `__mul__`, or exchange-rate logic). These are domain operations that belong
+  to a billing phase, not to the value object itself.
+- `Metadata` values are restricted to strings for hashability and simplicity;
+  the Phase 1.7 `app/schemas/common.py` `Metadata` alias is still
+  `dict[str, Any]` and remains the serialization-side concern.
+- `Email` validation is a pragmatic regular expression; it accepts most valid
+  addresses and rejects clearly malformed ones but does not implement the full
+  RFC 5322 grammar. Tighten it if a stricter contract is ever needed.
+- `Url` validates scheme and host presence but performs no network-level or
+  DNS checks, which is intentional for a domain value object.
+- `folder_structure.md` still lists `app/models/` as the future home of
+  domain models; the implemented home is `app/domain/`. The docs can be
+  aligned when the roadmap is next updated.
 
 ---
 

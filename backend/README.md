@@ -27,7 +27,9 @@ environment (a multi-stage Dockerfile with a minimal production runtime
 image and a production Docker Compose stack), and the Phase 2.1 domain
 foundation (framework-independent base classes for entities, aggregates,
 value objects, domain events, and identities, plus the domain exception
-hierarchy).
+hierarchy), and the Phase 2.2 domain value objects (reusable, immutable,
+self-validating value objects for identifiers, emails, names, slugs,
+timestamps, URLs, versions, money, and metadata).
 
 ## Structure
 
@@ -81,7 +83,18 @@ backend/
 │   │   ├── aggregate.py       # AggregateRoot
 │   │   ├── value_object.py    # ValueObject
 │   │   ├── event.py           # DomainEvent
-│   │   └── exceptions.py      # Domain exception hierarchy
+│   │   ├── exceptions.py      # Domain exception hierarchy
+│   │   └── value_objects/     # Concrete domain value objects
+│   │       ├── __init__.py    # Public value object exports
+│   │       ├── id.py          # UuidIdentity
+│   │       ├── email.py       # Email
+│   │       ├── name.py        # Name
+│   │       ├── slug.py        # Slug
+│   │       ├── timestamp.py   # Timestamp
+│   │       ├── url.py         # Url
+│   │       ├── version.py     # Version
+│   │       ├── money.py       # Money
+│   │       └── metadata.py    # Metadata
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -287,6 +300,7 @@ can be reused by every future module (Clean Architecture).
 | `value_object.py`| `ValueObject`                                     |
 | `event.py`       | `DomainEvent`                                     |
 | `exceptions.py`  | Domain exception hierarchy                        |
+| `value_objects/` | Concrete, reusable value objects (package)        |
 
 ### Entities
 
@@ -333,6 +347,49 @@ class Email(ValueObject):
     value: str
 ```
 
+### Concrete Value Objects
+
+The reusable value objects live in `app/domain/value_objects/` and are
+imported from a single location:
+
+```python
+from app.domain.value_objects import Email, Money, UuidIdentity, Version
+```
+
+Every value object is immutable, validates its value at construction, is
+compared and hashed by value, and has a meaningful string representation.
+They depend only on the Python standard library (no dataclasses, FastAPI,
+Pydantic, or SQLAlchemy); immutability is enforced by overriding
+`__setattr__` to reject assignments after construction.
+
+| File         | Class          | Stores / validates                                          |
+| ------------ | -------------- | ----------------------------------------------------------- |
+| `id.py`      | `UuidIdentity` | A UUID4 entity identity; `generate()` and `parse()` helpers |
+| `email.py`   | `Email`        | A normalized, syntactically valid email address             |
+| `name.py`    | `Name`         | A trimmed, non-empty display name (max 120 characters)      |
+| `slug.py`    | `Slug`         | A lowercase URL-friendly slug (`a-z0-9` and single hyphens) |
+| `timestamp.py`| `Timestamp`   | A timezone-aware UTC moment; `now()` and `parse()` helpers  |
+| `url.py`     | `Url`          | An absolute `http`/`https` URL                              |
+| `version.py` | `Version`      | A `major.minor.patch` semantic version; `parse()` helper    |
+| `money.py`   | `Money`        | A `Decimal` amount with an ISO 4217 currency code           |
+| `metadata.py`| `Metadata`     | An immutable string key/value metadata map                  |
+
+```python
+from decimal import Decimal
+
+from app.domain.value_objects import Email, Money, UuidIdentity, Version
+
+user_id = UuidIdentity.generate()
+parsed_id = UuidIdentity.parse("123e4567-e89b-12d3-a456-426614174000")
+email = Email("User@Example.com")          # normalized to user@example.com
+version = Version.parse("1.2.3")
+price = Money(Decimal("19.99"), "USD")
+```
+
+Invalid values raise `InvalidValue` (a `DomainException` subclass) at
+construction instead of being silently accepted, so entities can never hold a
+malformed value object.
+
 ### Domain Events
 
 `DomainEvent` (in `app/domain/event.py`) is an immutable record that something
@@ -360,6 +417,7 @@ hierarchy:
 | `BusinessRuleViolation`| An enterprise business rule or invariant was broken |
 | `EntityNotFound`       | A requested entity does not exist                   |
 | `InvalidOperation`     | An operation is not valid in the current state      |
+| `InvalidValue`         | A value object was constructed with an invalid value |
 
 Outer layers translate these into their own error contract (for example the
 FastAPI `TWIBException` hierarchy in `app/core/exceptions.py`).
@@ -1089,9 +1147,14 @@ deferred until those subsystems exist.
 - The domain layer in `app/domain/` defines the framework-independent base
   classes (`Entity`, `AggregateRoot`, `ValueObject`, `DomainEvent`,
   `Identity`) and the domain exception hierarchy (`DomainException`,
-  `BusinessRuleViolation`, `EntityNotFound`, `InvalidOperation`). It depends
-  only on the Python standard library and is consumed by outer layers
-  (services, repositories, API) in later phases.
+  `BusinessRuleViolation`, `EntityNotFound`, `InvalidOperation`,
+  `InvalidValue`). It depends only on the Python standard library and is
+  consumed by outer layers (services, repositories, API) in later phases.
+- The concrete value objects in `app/domain/value_objects/` (identities,
+  emails, names, slugs, timestamps, URLs, versions, money, and metadata) are
+  immutable, validate their value at construction, and compare by value. They
+  are imported from `app.domain.value_objects` and raise `InvalidValue` on
+  invalid input; no serialization or framework code lives here.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

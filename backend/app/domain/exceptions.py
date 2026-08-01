@@ -48,3 +48,7 @@ class EntityNotFound(DomainException):
 
 class InvalidOperation(DomainException):
     """Raised when an operation is not valid in the current state."""
+
+
+class InvalidValue(DomainException):
+    """Raised when a value object is constructed with an invalid value."""

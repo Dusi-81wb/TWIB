@@ -24,6 +24,7 @@ from app.domain.exceptions import (
     DomainException,
     EntityNotFound,
     InvalidOperation,
+    InvalidValue,
 )
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "EntityNotFound",
     "Identity",
     "InvalidOperation",
+    "InvalidValue",
     "ValueObject",
 ]
