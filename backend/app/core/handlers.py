@@ -18,6 +18,7 @@ from app.core.error_codes import (
 )
 from app.core.exceptions import TWIBException
 from app.core.logging import get_logger
+from app.schemas.response import ErrorDetail, ErrorResponse
 
 logger = get_logger(__name__)
 
@@ -35,12 +36,11 @@ def _error_payload(
         details: Optional structured information about the error.
 
     Returns:
-        A dictionary matching the shared error response contract.
+        A dictionary matching the shared :class:`ErrorResponse` contract.
     """
-    error: dict = {"code": code, "message": message}
-    if details:
-        error["details"] = details
-    return {"success": False, "error": error}
+    return ErrorResponse(
+        error=ErrorDetail(code=code, message=message, details=details),
+    ).model_dump(mode="json", exclude_none=True)
 
 
 async def twib_exception_handler(request: Request, exc: TWIBException) -> JSONResponse:

@@ -11,8 +11,10 @@ environment variables), the Phase 1.3 structured logging system
 injection container (dependency-injector with container-backed FastAPI
 dependencies), the Phase 1.5 global exception handling system
 (consistent JSON error responses for application, validation, HTTP, and
-unhandled errors), and the Phase 1.6 middleware infrastructure (request
-IDs, security headers, and settings-driven CORS).
+unhandled errors), the Phase 1.6 middleware infrastructure (request
+IDs, security headers, and settings-driven CORS), and the Phase 1.7 API
+foundation (reusable response and pagination schemas, centralized API
+tags, response helper functions, and a configured OpenAPI document).
 
 ## Structure
 
@@ -26,9 +28,17 @@ backend/
 │   ├── dependencies.py    # FastAPI dependencies (resolve from container)
 │   ├── api/
 │   │   ├── router.py      # Root API router (/api)
+│   │   ├── responses.py   # Centralized response helpers
+│   │   ├── tags.py        # Centralized OpenAPI tags
+│   │   ├── openapi.py     # OpenAPI metadata (description, contact, license, tags)
 │   │   └── v1/
 │   │       ├── __init__.py
 │   │       └── health.py  # Health endpoint (/api/v1/health)
+│   ├── schemas/
+│   │   ├── __init__.py    # Public schema exports
+│   │   ├── common.py      # EntityId, timestamps, Metadata, TimestampedModel
+│   │   ├── pagination.py  # PaginationMeta, PaginatedResponse[T]
+│   │   └── response.py    # SuccessResponse, ErrorResponse, MessageResponse, HealthResponse
 │   ├── core/
 │   │   ├── constants.py     # Application-wide constants
 │   │   ├── environments.py  # Supported APP_ENV values
@@ -339,6 +349,102 @@ CORS is configured in `app/middleware/cors.py` using FastAPI's
 CORS_ORIGINS=["https://app.example.com"]
 ```
 
+## API Foundation
+
+The API foundation defines the standards every future endpoint follows. It
+consists of reusable schemas, centralized tags, response helpers, and a
+configured OpenAPI document. No business endpoints were added in this
+phase.
+
+### Response Models
+
+Reusable Pydantic response models live in `app/schemas/response.py`:
+
+| Model            | Purpose                                            |
+| ---------------- | -------------------------------------------------- |
+| `SuccessResponse[T]` | Successful response envelope: `{"success": true, "data": ...}` |
+| `ErrorResponse`  | Error envelope: `{"success": false, "error": {...}}` |
+| `MessageResponse` | Success envelope carrying only a message           |
+| `HealthResponse` | Health check response body                          |
+
+The generic `SuccessResponse[T]` wraps any payload type. `ErrorResponse`
+uses `ErrorDetail`, which mirrors the JSON contract produced by the global
+exception handlers in `app/core/handlers.py`, so every error response has
+one source of truth.
+
+### Common Schemas
+
+`app/schemas/common.py` provides reusable primitives:
+
+- `EntityId` - a UUID identifier alias used for entity primary keys.
+- `Timestamp`, `CreatedAt`, `UpdatedAt` - datetime aliases for time fields.
+- `Metadata` - an arbitrary key/value dict alias.
+- `TimestampedModel` - a base model that adds `created_at` and `updated_at`.
+
+These are shared across all modules so schemas never redefine common field
+types.
+
+### Pagination
+
+`app/schemas/pagination.py` provides `PaginationMeta` and the generic
+`PaginatedResponse[T]`. The models describe the shape of a paginated list
+response and contain no pagination logic; page calculation belongs to
+repositories and services in later phases.
+
+```python
+class PaginatedResponse(BaseModel, Generic[T]):
+    success: bool = True
+    data: list[T]
+    pagination: PaginationMeta
+```
+
+### API Tags
+
+All OpenAPI tags are defined as constants in `app/api/tags.py`. Every
+future router declares its tag from this module so tag names stay
+consistent:
+
+| Constant           | Value            |
+| ------------------ | ---------------- |
+| `HEALTH`           | `health`         |
+| `AUTHENTICATION`   | `authentication` |
+| `USERS`            | `users`          |
+| `ORGANIZATIONS`    | `organizations`  |
+| `WORKFLOWS`        | `workflows`      |
+| `AGENTS`           | `agents`         |
+| `BILLING`          | `billing`        |
+| `ADMIN`            | `admin`          |
+| `ANALYTICS`        | `analytics`      |
+| `STORAGE`          | `storage`        |
+
+### Response Helpers
+
+`app/api/responses.py` provides centralized helpers that build consistent
+response bodies from the shared schemas:
+
+| Helper                | HTTP Status | Envelope                                  |
+| --------------------- | ----------- | ----------------------------------------- |
+| `success(data)`       | `200`       | `{"success": true, "data": ...}`          |
+| `created(data)`       | `201`       | `{"success": true, "data": ...}`          |
+| `accepted(data=None)` | `202`       | `{"success": true, "data": ...}`          |
+| `no_content()`        | `204`       | empty body                                |
+| `error(code, msg, ...)` | `400`     | `{"success": false, "error": {...}}`      |
+
+### OpenAPI
+
+OpenAPI metadata is centralized in `app/api/openapi.py` and wired into the
+FastAPI instance by `create_application()`. The document now configures:
+
+- **Title** - `TWIB`
+- **Version** - `0.1.0`
+- **Description** - a summary of the platform and the response envelope
+  contract.
+- **Contact** - TWIB (GitHub repository).
+- **License** - MIT.
+- **Tags** - the ten centralized tags with descriptions.
+
+Routes were not modified; only the API document metadata was improved.
+
 ## How to Install
 
 Prerequisites:
@@ -408,8 +514,10 @@ Interactive API documentation is available at:
   `register_middlewares()`. Every request receives a `UUID4` request ID,
   security headers are applied to every response, and CORS reads origins
   from settings.
-- Logging, dependency injection, exception handling, and middleware are
-  the cross-cutting infrastructure implemented so far. Authentication and
-  request logging are intentionally deferred to later phases.
+- Logging, dependency injection, exception handling, middleware, and the
+  API foundation (schemas, tags, response helpers, OpenAPI metadata) are
+  the cross-cutting infrastructure implemented so far. Authentication,
+  database, and business endpoints are intentionally deferred to later
+  phases.
 - Follow the project coding guidelines (PEP 8, type hints, Google-style
   docstrings). Do not add code outside the current phase.

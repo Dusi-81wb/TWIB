@@ -27,7 +27,7 @@ Architecture        ████████████████████
 
 Documentation       ████████████████████ 100%
 
-Foundation          ████████████████████  80%
+Foundation          ██████████████████░  88%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -56,7 +56,7 @@ Sprint 1
 
 # Current Phase
 
-Phase 1.7 — API Foundation
+Phase 1.8 — Code Quality
 
 ---
 
@@ -68,7 +68,8 @@ Phase 1.7 — API Foundation
 
 # Current Objective
 
-Implement the foundational API layer for the FastAPI backend.
+Establish the code quality tooling phase for the FastAPI backend
+(linting, formatting, and type checking).
 
 Do NOT implement
 
@@ -82,32 +83,39 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 1.6
+✅ Phase 1.7
 
 Completed
 
-- Reusable middleware package in `app/middleware/`
-- `RequestIDMiddleware` assigns a `UUID4` to every request, stores it on
-  `request.state.request_id`, binds it to the structured log context, and
-  echoes it in the `X-Request-ID` response header
-- `SecurityHeadersMiddleware` adds `X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`, and `X-XSS-Protection` to every
-  response (CSP deferred)
-- CORS configured from `settings.cors_origins` using FastAPI
-  `CORSMiddleware`; no hardcoded origins
-- Central `register_middlewares(application, settings)`; the application
-  factory calls only this function
-- `backend/README.md` documents request IDs, security headers, and CORS
+- Reusable Pydantic response models in `app/schemas/response.py`:
+  `SuccessResponse[T]`, `ErrorResponse`, `MessageResponse`, and
+  `HealthResponse`; `ErrorResponse` matches the JSON contract already
+  produced by the global exception handlers
+- Reusable pagination schemas in `app/schemas/pagination.py`:
+  `PaginationMeta` and generic `PaginatedResponse[T]`; no pagination logic
+- Reusable common schemas in `app/schemas/common.py`: `EntityId`,
+  `Timestamp`, `CreatedAt`, `UpdatedAt`, `Metadata`, and the
+  `TimestampedModel` base class
+- Centralized API tags in `app/api/tags.py`: health, authentication,
+  users, organizations, workflows, agents, billing, admin, analytics,
+  storage (constants only)
+- Centralized response helpers in `app/api/responses.py` for success,
+  created, accepted, no-content, and error responses
+- OpenAPI document configured with title, description, version, contact,
+  license, and tag metadata via `app/api/openapi.py`; no routes modified
+- `app/core/handlers.py` refactored to build error bodies from the shared
+  `ErrorResponse` schema (single source of truth)
+- `backend/README.md` documents the API foundation
 
-(Previous: ✅ Phase 1.5 — Global exception handling)
+(Previous: ✅ Phase 1.6 — Middleware infrastructure)
 
 ---
 
 # Next Milestone
 
-Phase 1.7
+Phase 1.8
 
-API Foundation
+Code Quality
 
 ---
 
@@ -244,22 +252,20 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/middleware/__init__.py
-- backend/app/middleware/cors.py
-- backend/app/middleware/request_id.py
-- backend/app/middleware/security_headers.py
-- backend/app/middleware/registration.py
+- backend/app/schemas/__init__.py
+- backend/app/schemas/common.py
+- backend/app/schemas/pagination.py
+- backend/app/schemas/response.py
+- backend/app/api/tags.py
+- backend/app/api/responses.py
+- backend/app/api/openapi.py
 - backend/app/application.py
+- backend/app/core/handlers.py
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
-(Also in this sprint: backend/pyproject.toml, backend/app/container.py,
-backend/app/dependencies.py, backend/app/core/settings.py,
-backend/app/core/config.py, backend/app/core/environments.py,
-backend/app/core/logging.py, backend/app/core/error_codes.py,
-backend/app/core/exceptions.py, backend/app/core/handlers.py,
-backend/.env.example, backend/app/lifecycle.py, backend/uv.lock — from the
-previous Phase 1.1-1.5 sessions.)
+(Also in this sprint: the Phase 1.1-1.6 files listed in the previous
+milestone summaries.)
 
 # Pending Tasks
 
@@ -315,6 +321,19 @@ previous Phase 1.1-1.5 sessions.)
 - [x] Central `register_middlewares()` registration
 - [x] Application factory calls `register_middlewares()` only
 - [x] README documentation for middleware
+
+## Phase 1.7
+
+- [x] Reusable response models (`app/schemas/response.py`)
+- [x] Generic `SuccessResponse[T]`
+- [x] Reusable pagination schemas (`app/schemas/pagination.py`)
+- [x] Reusable common schemas (`app/schemas/common.py`)
+- [x] Centralized API tags (`app/api/tags.py`)
+- [x] OpenAPI metadata module (`app/api/openapi.py`)
+- [x] OpenAPI wired into the application factory
+- [x] Centralized response helpers (`app/api/responses.py`)
+- [x] Error handlers reuse the `ErrorResponse` schema
+- [x] README documentation for the API foundation
 
 ---
 
@@ -402,11 +421,88 @@ Completed
 
 - Phase 1.6 Middleware
 
+Session 8
+
+Completed
+
+- Phase 1.7 API Foundation
+
 Next Session
 
-Phase 1.7
+Phase 1.8
 
-API Foundation
+Code Quality
+
+---
+
+# Phase 1.7 Summary
+
+## Files Created
+
+- backend/app/schemas/__init__.py
+- backend/app/schemas/common.py
+- backend/app/schemas/pagination.py
+- backend/app/schemas/response.py
+- backend/app/api/tags.py
+- backend/app/api/responses.py
+- backend/app/api/openapi.py
+
+## Files Modified
+
+- backend/app/application.py
+- backend/app/core/handlers.py
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `SuccessResponse[T]`, `ErrorResponse`, `MessageResponse`, and
+  `HealthResponse` serialize to the documented envelopes; `ErrorResponse`
+  matches the JSON contract produced by the global exception handlers.
+- `PaginatedResponse[T]` and `PaginationMeta` validate and serialize a
+  generic page of items; no pagination logic was added.
+- `EntityId`, `Timestamp`, `CreatedAt`, `UpdatedAt`, `Metadata`, and
+  `TimestampedModel` are reusable across modules without duplication.
+- `app/api/tags.py` exposes ten tag constants; `app/api/openapi.py` builds
+  the ordered OpenAPI tag list from them.
+- The OpenAPI document now includes the title (`TWIB`), version (`0.1.0`),
+  description, contact, license (MIT), and the ten centralized tags.
+  No routes were modified.
+- Response helpers (`success`, `created`, `accepted`, `no_content`,
+  `error`) return consistent envelopes with the correct status codes.
+- `app/core/handlers.py` builds error bodies from the shared `ErrorResponse`
+  schema; the output contract is byte-identical to the previous inline
+  payload.
+- No authentication, database, CRUD, or workflow logic was implemented.
+
+---
+
+# Phase 1.7 Suggestions (Not Implemented)
+
+- The health endpoint still returns a bare dictionary instead of the new
+  `HealthResponse` model. Wrapping it would align the route with the
+  response-envelope standard once routes are allowed to be modified.
+- `SuccessResponse` and `PaginatedResponse` duplicate the same `success`
+  field. `PaginatedResponse` could inherit from `SuccessResponse[list[T]]`
+  to reduce the duplication, but keeping them independent is clearer for
+  the OpenAPI contract.
+- The `openapi_tags` descriptions and the centralized tag constants could
+  drift if new tags are added in only one place; a small mapping from
+  constant to description in `app/api/openapi.py` keeps them in sync.
+- Response helpers return `JSONResponse` directly, which bypasses FastAPI's
+  `response_model` serialization. Future routers should declare
+  `response_model=SuccessResponse[Model]` in their signatures so the
+  OpenAPI document describes endpoint payloads accurately.
+- `Metadata` is currently an unconstrained `dict[str, Any]`. A
+  JSON-compatible validation (rejecting non-serializable values) would
+  harden request schemas in later phases.
+- Consider registering an OpenAPI generator hook to inject the response
+  envelope as the default response for every endpoint, avoiding repetition
+  across routers.
 
 ---
 
@@ -618,6 +714,8 @@ feat(phase-1.4): implement dependency injection
 feat(phase-1.5): add global exception handling
 
 feat(phase-1.6): add middleware infrastructure
+
+feat(phase-1.7): add API foundation
 ```
 
 ---
