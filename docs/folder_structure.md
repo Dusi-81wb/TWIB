@@ -1,5 +1,12 @@
 # TWIB Folder Structure Reference
 
+> **Scope:** The tree below is the **target** repository structure. Top-level
+> packages that are not yet implemented (`frontend/`, `agents/`, `workflows/`,
+> `llm/`, `database/`, `auth/`, `cache/`, `vector_db/`, `storage/`, `payments/`,
+> `analytics/`, `realtime/`, `security/`) currently exist only as README-only
+> scaffolding. The `backend/` subtree reflects the **implemented** layout
+> (see ADR-0008).
+
 ## Complete Directory Tree
 
 ```
@@ -36,149 +43,71 @@ TWIB/
 │   ├── .eslintrc.json
 │   └── README.md
 │
-├── backend/                 # FastAPI Application
-│   ├── api/                 # Route Definitions (Thin)
-│   │   ├── v1/              # API Version 1
-│   │   │   ├── routes/      # Route modules
-│   │   │   │   ├── auth.py
-│   │   │   │   ├── users.py
-│   │   │   │   ├── organizations.py
-│   │   │   │   ├── workflows.py
-│   │   │   │   ├── agents.py
-│   │   │   │   ├── executions.py
-│   │   │   │   ├── templates.py
-│   │   │   │   ├── analytics.py
-│   │   │   │   └── billing.py
-│   │   │   ├── dependencies.py  # API-specific DI
-│   │   │   └── router.py    # Main v1 router
-│   │   ├── dependencies.py  # Shared API dependencies
-│   │   └── router.py        # Root API router
-│   │
-│   ├── middleware/          # Cross-Cutting Concerns
+├── backend/                 # FastAPI Application (single package: app)
+│   ├── app/                 # Application package (import root: app.*)
 │   │   ├── __init__.py
-│   │   ├── logging.py       # Request/response logging
-│   │   ├── auth.py          # JWT validation
-│   │   ├── rate_limit.py    # Rate limiting
-│   │   ├── cors.py          # CORS configuration
-│   │   ├── errors.py        # Exception handlers
-│   │   ├── metrics.py       # Prometheus metrics
-│   │   └── request_id.py    # Correlation IDs
+│   │   ├── main.py          # Uvicorn entrypoint (app.main:app)
+│   │   ├── application.py   # FastAPI application factory
+│   │   ├── container.py     # DI container (dependency-injector)
+│   │   ├── dependencies.py  # Shared FastAPI dependencies
+│   │   ├── lifecycle.py     # Startup/shutdown logging
+│   │   ├── api/             # Route Definitions (Thin)
+│   │   │   ├── v1/          # API Version 1
+│   │   │   │   ├── health.py
+│   │   │   │   ├── auth.py          (Phase 2)
+│   │   │   │   ├── users.py         (Phase 2)
+│   │   │   │   ├── organizations.py (Phase 2)
+│   │   │   │   ├── workflows.py     (Phase 4+)
+│   │   │   │   ├── agents.py        (Phase 5+)
+│   │   │   │   └── executions.py    (Phase 4+)
+│   │   │   ├── router.py    # Root API router
+│   │   │   ├── tags.py      # Centralized API tags
+│   │   │   ├── openapi.py   # OpenAPI metadata
+│   │   │   └── responses.py # Response helpers
+│   │   ├── core/            # Configuration, logging, exceptions
+│   │   │   ├── __init__.py
+│   │   │   ├── settings.py  # Pydantic Settings
+│   │   │   ├── config.py    # Settings loader (lru_cache)
+│   │   │   ├── environments.py
+│   │   │   ├── constants.py
+│   │   │   ├── logging.py   # structlog setup
+│   │   │   ├── exceptions.py# TWIBException hierarchy
+│   │   │   ├── error_codes.py
+│   │   │   └── handlers.py  # Global exception handlers
+│   │   ├── middleware/      # Cross-Cutting Concerns
+│   │   │   ├── __init__.py
+│   │   │   ├── registration.py # Central registration
+│   │   │   ├── request_id.py   # Correlation IDs
+│   │   │   ├── security_headers.py
+│   │   │   ├── cors.py         # CORS configuration
+│   │   │   └── observability.py
+│   │   ├── observability/   # Metrics/tracing protocols + request context
+│   │   │   ├── __init__.py
+│   │   │   ├── request_context.py
+│   │   │   ├── events.py
+│   │   │   ├── metrics.py   # Counter/Gauge/Histogram/Timer protocols
+│   │   │   └── tracing.py   # Tracer/Span protocols
+│   │   ├── schemas/         # Pydantic Models (Contracts)
+│   │   │   ├── __init__.py
+│   │   │   ├── common.py
+│   │   │   ├── pagination.py
+│   │   │   └── response.py  # SuccessResponse / ErrorResponse
+│   │   ├── shared/          # Shared helpers
+│   │   ├── services/        # Business Logic (future — Phase 3+)
+│   │   ├── repositories/    # Repository interfaces (future)
+│   │   ├── models/          # Domain models (future)
+│   │   └── infrastructure/  # Adapters: auth, llm, db, cache (future)
 │   │
-│   ├── dependencies/        # Dependency Injection
+│   ├── tests/               # Pytest Suite (imports app.*)
 │   │   ├── __init__.py
-│   │   ├── container.py     # Main DI container
-│   │   ├── providers.py     # Provider registrations
-│   │   ├── protocols/       # Interface definitions
-│   │   │   ├── repository.py
-│   │   │   ├── service.py
-│   │   │   ├── llm.py
-│   │   │   ├── cache.py
-│   │   │   └── storage.py
-│   │   └── scopes.py        # Scope definitions
-│   │
-│   ├── config/              # Configuration Management
-│   │   ├── __init__.py
-│   │   ├── settings.py      # Pydantic Settings
-│   │   ├── database.py      # Database config
-│   │   ├── redis.py         # Redis config
-│   │   ├── llm.py           # LLM provider config
-│   │   ├── auth.py          # Auth config
-│   │   ├── storage.py       # Storage config
-│   │   └── feature_flags.py # Feature flags
-│   │
-│   ├── websocket/           # Real-time Communication
-│   │   ├── __init__.py
-│   │   ├── router.py        # WebSocket routes
-│   │   ├── manager.py       # Connection manager
-│   │   ├── handlers/        # Message handlers
-│   │   │   ├── presence.py
-│   │   │   ├── workflow.py
-│   │   │   └── collaboration.py
-│   │   ├── schemas.py       # Message schemas
-│   │   └── auth.py          # WS authentication
-│   │
-│   ├── services/            # Business Logic (CORE)
-│   │   ├── __init__.py
-│   │   ├── base.py          # Base service class
-│   │   ├── user/            # User management
-│   │   │   ├── service.py
-│   │   │   ├── protocols.py
-│   │   │   └── events.py
-│   │   ├── organization/    # Organization management
-│   │   ├── workflow/        # Workflow orchestration
-│   │   │   ├── generation.py
-│   │   │   ├── execution.py
-│   │   │   ├── template.py
-│   │   │   └── validation.py
-│   │   ├── agent/           # Agent coordination
-│   │   │   ├── planner.py
-│   │   │   ├── analyst.py
-│   │   │   ├── architect.py
-│   │   │   ├── validator.py
-│   │   │   ├── optimizer.py
-│   │   │   ├── researcher.py
-│   │   │   ├── documentation.py
-│   │   │   └── supervisor.py
-│   │   ├── billing/         # Billing & subscriptions
-│   │   ├── analytics/       # Analytics aggregation
-│   │   └── notification/    # Notifications
-│   │
-│   ├── schemas/             # Pydantic Models (Contracts)
-│   │   ├── __init__.py
-│   │   ├── base.py          # Base schemas
-│   │   ├── common.py        # Shared types
-│   │   ├── errors.py        # Error responses
-│   │   ├── pagination.py    # Pagination schemas
-│   │   ├── auth/            # Auth schemas
-│   │   ├── user/            # User schemas
-│   │   ├── organization/    # Org schemas
-│   │   ├── workflow/        # Workflow schemas
-│   │   ├── agent/           # Agent schemas
-│   │   ├── execution/       # Execution schemas
-│   │   ├── template/        # Template schemas
-│   │   ├── analytics/       # Analytics schemas
-│   │   └── billing/         # Billing schemas
-│   │
-│   ├── exceptions/          # Exception Hierarchy
-│   │   ├── __init__.py
-│   │   ├── base.py          # Base exceptions
-│   │   ├── http.py          # HTTP exceptions
-│   │   ├── domain/          # Domain exceptions
-│   │   │   ├── user.py
-│   │   │   ├── workflow.py
-│   │   │   ├── agent.py
-│   │   │   └── billing.py
-│   │   ├── infrastructure/  # Infrastructure exceptions
-│   │   │   ├── database.py
-│   │   │   ├── llm.py
-│   │   │   ├── cache.py
-│   │   │   └── storage.py
-│   │   └── handlers.py      # Exception handlers
-│   │
-│   ├── utils/               # Pure Utilities
-│   │   ├── __init__.py
-│   │   ├── strings.py       # String helpers
-│   │   ├── dates.py         # Date/time helpers
-│   │   ├── crypto.py        # Crypto helpers
-│   │   ├── validation.py    # Validation helpers
-│   │   ├── collections.py   # Collection helpers
-│   │   ├── async.py         # Async helpers
-│   │   ├── serialization.py # Serialization
-│   │   └── logging.py       # Logging setup
-│   │
-│   ├── core/                # Application Bootstrap
-│   │   ├── __init__.py
-│   │   ├── app.py           # FastAPI factory
-│   │   ├── lifespan.py      # Lifespan events
-│   │   ├── health.py        # Health checks
-│   │   └── openapi.py       # OpenAPI customization
+│   │   ├── conftest.py
+│   │   └── test_health.py
 │   │
 │   ├── pyproject.toml
-│   ├── poetry.lock
-│   ├── .python-version
+│   ├── uv.lock
+│   ├── .python-version      # 3.12
 │   ├── pytest.ini
-│   ├── .ruff.toml
-│   ├── .mypy.ini
+│   ├── .env.example
 │   └── README.md
 │
 ├── agents/                  # AI Agent Implementations
@@ -511,15 +440,11 @@ TWIB/
 │   └── schemas.py
 │
 ├── docker/                  # Docker Configurations
-│   ├── Dockerfile.backend
-│   ├── Dockerfile.frontend
-│   ├── docker-compose.yml
-│   ├── docker-compose.dev.yml
-│   ├── docker-compose.prod.yml
-│   ├── .dockerignore
-│   └── scripts/
-│       ├── build.sh
-│       └── push.sh
+│   ├── development/
+│   │   └── docker-compose.yml  # Dev stack (backend, postgres, redis, qdrant)
+│   ├── production/
+│   │   └── docker-compose.yml  # Production stack
+│   └── README.md
 │
 ├── deployment/              # Deployment Manifests
 │   ├── k8s/
@@ -557,41 +482,7 @@ TWIB/
 │       ├── staging.yaml
 │       └── production.yaml
 │
-├── tests/                   # Test Suite
-│   ├── __init__.py
-│   ├── conftest.py          # Pytest configuration
-│   ├── unit/                # Unit Tests
-│   │   ├── test_services/
-│   │   ├── test_agents/
-│   │   ├── test_workflows/
-│   │   ├── test_llm/
-│   │   └── test_utils/
-│   ├── integration/         # Integration Tests
-│   │   ├── test_database/
-│   │   ├── test_llm_providers/
-│   │   ├── test_vector_db/
-│   │   ├── test_cache/
-│   │   └── test_payments/
-│   ├── e2e/                 # End-to-End Tests
-│   │   ├── test_workflow_generation.py
-│   │   ├── test_workflow_execution.py
-│   │   ├── test_agent_collaboration.py
-│   │   └── test_auth_flow.py
-│   ├── contract/            # Contract Tests
-│   │   ├── test_api_v1.py
-│   │   └── test_schemas.py
-│   ├── performance/         # Performance Tests
-│   │   ├── test_api_load.py
-│   │   ├── test_workflow_throughput.py
-│   │   └── test_llm_latency.py
-│   ├── chaos/               # Chaos Engineering
-│   │   ├── test_db_failure.py
-│   │   ├── test_llm_failure.py
-│   │   └── test_network_partition.py
-│   └── fixtures/            # Test Fixtures
-│       ├── factories.py
-│       ├── data.py
-│       └── mocks.py
+├── tests/                   # (README-only scaffolding — active tests live in backend/tests/)
 │
 ├── docs/                    # Documentation
 │   ├── architecture.md
@@ -610,17 +501,19 @@ TWIB/
 │   ├── test.sh
 │   └── typecheck.sh
 │
+├── Dockerfile              # Multi-stage backend image (development + runtime)
+├── .dockerignore
 ├── .gitignore
 ├── .editorconfig
+├── .pre-commit-config.yaml
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── CODE_OF_CONDUCT.md
 ├── SECURITY.md
 ├── CHANGELOG.md
-├── README.md
-├── pyproject.toml           # Root Python config (for shared tools)
-├── package.json             # Root Node config (for shared tools)
-└── Makefile                 # Common commands
+└── README.md
+# Planned (future phases): root pyproject.toml, package.json, Makefile,
+# scripts/, and .github/workflows/
 ```
 
 ## Directory Naming Conventions

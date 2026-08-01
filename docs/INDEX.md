@@ -73,6 +73,8 @@ For new contributors and AI models:
 | [adr/0005-agent-orchestrator.md](adr/0005-agent-orchestrator.md) | Agent Orchestrator |
 | [adr/0006-qdrant.md](adr/0006-qdrant.md) | Qdrant |
 | [adr/0007-workflow-engine.md](adr/0007-workflow-engine.md) | Workflow Engine |
+| [adr/0008-backend-package-layout.md](adr/0008-backend-package-layout.md) | Backend Package Layout |
+| [adr/0009-authentication-hybrid.md](adr/0009-authentication-hybrid.md) | Authentication & Authorization (Hybrid) |
 
 ### Diagrams
 

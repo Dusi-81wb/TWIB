@@ -249,9 +249,13 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- Dockerfile
-- docker/production/docker-compose.yml
-- backend/README.md
+- docs/adr/0008-backend-package-layout.md (created)
+- docs/adr/0009-authentication-hybrid.md (created)
+- docs/folder_structure.md
+- docs/coding_guidelines.md
+- docs/development_workflow.md
+- docs/INDEX.md
+- docs/architecture.md
 - docs/PROJECT_STATUS.md
 
 # Pending Tasks
@@ -370,7 +374,10 @@ _Not committed yet_
 
 ## Phase 1.13
 
-- [ ] Foundation review
+- [x] Foundation review
+- [x] ADR-0008 backend package layout
+- [x] ADR-0009 authentication (hybrid) decision
+- [x] Sync folder_structure.md / coding_guidelines.md / development_workflow.md
 
 ---
 
@@ -494,11 +501,17 @@ Completed
 
 - Phase 1.12 Docker Production
 
+Session 14
+
+Completed
+
+- Phase 1.13 Foundation Review (audit, ADR-0008, ADR-0009, doc sync)
+
 Next Session
 
-Phase 1.13
+Phase 2
 
-Foundation Review
+Authentication (per ADR-0009)
 
 ---
 
@@ -557,6 +570,58 @@ Foundation Review
 - No reverse proxy (NGINX/Traefik), orchestration, or cloud deployment is
   included; those remain out of scope for the foundation phases.
 - No application source files were modified in this phase.
+
+---
+
+# Phase 1.13 Summary
+
+## Files Created
+
+- docs/adr/0008-backend-package-layout.md
+- docs/adr/0009-authentication-hybrid.md
+
+## Files Modified
+
+- docs/folder_structure.md
+- docs/coding_guidelines.md
+- docs/development_workflow.md
+- docs/INDEX.md
+- docs/architecture.md
+- docs/PROJECT_STATUS.md
+
+## Architectural Decisions
+
+- ADR-0008: the backend is a single `backend/app/` package imported as
+  `app.*`. The README-only scaffolding directories directly under `backend/`
+  (api, config, dependencies, exceptions, middleware, schemas, services,
+  utils, websocket) are deprecated and must not receive new code.
+- ADR-0009: authentication is hybrid. Auth0/Clerk acts as the managed
+  Identity Provider (login, SSO, MFA); TWIB mints its own short-lived
+  session JWTs signed with `SECRET_KEY` plus opaque refresh tokens in Redis.
+  RBAC and API keys are TWIB-owned. `SECRET_KEY` becomes mandatory in
+  production.
+
+## Summary
+
+- Completed the Phase 1.13 read-only foundation audit (docs vs
+  implementation, folder structure, code quality, security, Docker) and
+  produced the full audit report (score 9/10, PASS WITH MINOR ISSUES).
+- Drafted ADR-0008 and ADR-0009 to close the two audit MUST-Fix items.
+- Synced `folder_structure.md`, `coding_guidelines.md`, and
+  `development_workflow.md` to the implemented `app/` layout, the uv
+  toolchain, and the real Docker compose paths and uvicorn entrypoint.
+- No application source, tests, or Docker files were changed in this phase.
+
+## Suggestions (Not Implemented)
+
+- The deprecated `backend/` scaffolding README directories are still on disk;
+  Phase 2 cleanup should remove them (see ADR-0008).
+- Audit Nice-to-Have items remain open: health route still returns a plain
+  dict, validation-error details still include `input`, `SECRET_KEY` is not
+  enforced in production, uv is pinned to `latest`, dev uses non-frozen sync,
+  no coverage fail-under, and Makefile/scripts/.github do not exist yet.
+- `roadmap.md` Phase 1 status and the roadmap/TECH_STACK authentication
+  wording can be aligned to ADR-0009 when the roadmap is next updated.
 
 ---
 

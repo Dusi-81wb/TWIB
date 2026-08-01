@@ -3335,15 +3335,17 @@ adr/
 
 0003-postgresql.md
 
-0004-qdrant.md
+0004-model-router.md
 
 0005-agent-orchestrator.md
 
-0006-model-router.md
+0006-qdrant.md
 
 0007-workflow-engine.md
 
-0008-event-bus.md
+0008-backend-package-layout.md
+
+0009-authentication-hybrid.md
 ```
 
 Each ADR records:

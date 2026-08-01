@@ -25,7 +25,7 @@ This document establishes mandatory coding standards for all contributors to TWI
 ### Files and Directories
 ```python
 # Directories: snake_case
-backend/services/workflow/generation.py
+app/services/workflow/generation.py
 
 # Python files: snake_case.py
 user_service.py
@@ -157,8 +157,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local third
-from backend.schemas.user import UserCreate, UserResponse
-from backend.protocols.repository import UserRepository
+from app.schemas.user import UserCreate, UserResponse
+from app.repositories.protocols.repository import UserRepository
 ```
 
 ---
@@ -206,7 +206,7 @@ async def call_llm_with_timeout(messages: list[Message]) -> Completion:
 
 ### Exception Hierarchy
 ```python
-# Base exceptions in backend/exceptions/
+# Base exceptions in app/core/exceptions/
 class TWIBError(Exception):
     """Base application error."""
     def __init__(
@@ -281,7 +281,7 @@ async def twib_error_handler(request: Request, exc: TWIBError) -> JSONResponse:
 
 ### Container Registration
 ```python
-# backend/dependencies/container.py
+# app/container.py
 from dependency_injector import containers, providers
 
 class Container(containers.DeclarativeContainer):
@@ -306,9 +306,9 @@ class Container(containers.DeclarativeContainer):
 
 ### Protocol Definition
 ```python
-# backend/dependencies/protocols/repository.py
+# app/repositories/protocols/repository.py
 from typing import Protocol
-from backend.domain.user import User, UserId
+from app.domain.user import User, UserId
 
 class UserRepository(Protocol):
     async def get_by_id(self, id: UserId) -> User | None: ...
@@ -319,7 +319,7 @@ class UserRepository(Protocol):
 
 ### Service Usage
 ```python
-# backend/services/user/service.py
+# app/services/user/service.py
 class UserService:
     def __init__(
         self,
@@ -393,7 +393,7 @@ class SQLUserRepository(Repository[User, UserId]):
 
 ### Base Service
 ```python
-# backend/services/base.py
+# app/services/base.py
 from abc import ABC
 
 class BaseService(ABC):
@@ -403,7 +403,7 @@ class BaseService(ABC):
 
 ### Service Implementation
 ```python
-# backend/services/workflow/generation.py
+# app/services/workflow/generation.py
 class WorkflowGenerationService(BaseService):
     def __init__(
         self,
@@ -548,11 +548,11 @@ async def create_workflow(self, data: WorkflowCreate) -> Workflow:
 
 ### Unit Test Structure
 ```python
-# tests/unit/test_services/test_workflow_generation.py
+# backend/tests/unit/test_services/test_workflow_generation.py
 import pytest
 from unittest.mock import AsyncMock, Mock
 
-from backend.services.workflow.generation import WorkflowGenerationService
+from app.services.workflow.generation import WorkflowGenerationService
 from agents.planner import PlannerAgent
 # ... other agents
 
@@ -600,7 +600,7 @@ class TestWorkflowGenerationService:
 
 ### Integration Test Patterns
 ```python
-# tests/integration/test_database/test_user_repo.py
+# backend/tests/integration/test_database/test_user_repo.py
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 

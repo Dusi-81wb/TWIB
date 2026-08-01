@@ -10,7 +10,7 @@ This document defines the complete development workflow for TWIB, from environme
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Python | 3.11+ | Backend runtime |
+| Python | 3.12 | Backend runtime |
 | Node.js | 20+ | Frontend runtime |
 | Docker | 24+ | Containerization |
 | Docker Compose | 2+ | Local orchestration |
@@ -25,13 +25,8 @@ This document defines the complete development workflow for TWIB, from environme
 # Navigate to backend
 cd TWIB/backend
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
-
-# Install dependencies (when ready)
-pip install -e ".[dev]"
+# Install dependencies with uv (uv.lock is committed)
+uv sync --all-groups
 
 # Copy environment template
 cp .env.example .env
@@ -40,6 +35,9 @@ cp .env.example .env
 # DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/twib
 # REDIS_URL=redis://localhost:6379/0
 # QDRANT_URL=http://localhost:6333
+
+# Run the API in development (hot reload)
+uv run uvicorn app.main:app --reload
 ```
 
 ### Frontend Setup
@@ -65,15 +63,18 @@ cp .env.example .env.local
 # From root directory
 cd TWIB
 
-# Start all services
-docker-compose -f docker/docker-compose.dev.yml up -d
+# Start all services (backend + postgres + redis + qdrant)
+docker compose -f docker/development/docker-compose.yml up -d
 
 # View logs
-docker-compose -f docker/docker-compose.dev.yml logs -f
+docker compose -f docker/development/docker-compose.yml logs -f
 
 # Stop services
-docker-compose -f docker/docker-compose.dev.yml down
+docker compose -f docker/development/docker-compose.yml down
 ```
+
+The production stack lives at `docker/production/docker-compose.yml`
+(see `backend/README.md` → Docker Production for build and run instructions).
 
 ---
 
@@ -246,12 +247,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: cd backend && pip install -e ".[dev]"
+        with: { python-version: '3.12' }
+      - run: cd backend && uv sync --frozen
       - run: cd backend && ruff check .
       - run: cd backend && ruff format --check .
       - run: cd backend && mypy .
-      - run: cd backend && pytest --cov=backend --cov-fail-under=80
+      - run: cd backend && pytest --cov-fail-under=80
 
   frontend:
     runs-on: ubuntu-latest
@@ -266,11 +267,11 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -f docker/Dockerfile.backend -t twib-backend .
-      - run: docker build -f docker/Dockerfile.frontend -t twib-frontend .
+      - run: docker build -f Dockerfile -t twib-backend .
+      # Frontend build job is added when the frontend exists (Phase 6+)
 ```
 
 ### Quality Standards
@@ -344,13 +345,13 @@ help:
 	@echo "  make clean        Clean build artifacts"
 
 dev-up:
-	docker-compose -f docker/docker-compose.dev.yml up -d
+	docker compose -f docker/development/docker-compose.yml up -d
 
 dev-down:
-	docker-compose -f docker/docker-compose.dev.yml down
+	docker compose -f docker/development/docker-compose.yml down
 
 dev-logs:
-	docker-compose -f docker/docker-compose.dev.yml logs -f
+	docker compose -f docker/development/docker-compose.yml logs -f
 
 lint:
 	cd backend && ruff check .
@@ -369,7 +370,7 @@ format:
 	cd frontend && npm run format
 
 clean:
-	docker-compose -f docker/docker-compose.dev.yml down -v
+	docker compose -f docker/development/docker-compose.yml down -v
 	rm -rf backend/.venv frontend/node_modules
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
@@ -383,11 +384,11 @@ clean:
 ### Backend Debugging
 ```bash
 # Attach debugger to running container
-docker exec -it twib-backend python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn backend.core.app:app --host 0.0.0.0 --port 8000
+docker exec -it twib-backend python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Or run locally with debugger
 cd backend
-python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn backend.core.app:app --reload
+python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --reload
 ```
 
 ### Database Debugging
@@ -418,8 +419,8 @@ npm run start
 
 ### Local Observability
 ```bash
-# Start monitoring stack
-docker-compose -f docker/docker-compose.monitoring.yml up -d
+# Start monitoring stack (planned — monitoring compose is not yet created)
+# docker compose -f docker/development/docker-compose.monitoring.yml up -d
 
 # Access
 # Prometheus: http://localhost:9090
@@ -444,7 +445,7 @@ docker logs twib-backend | jq 'select(.correlation_id=="abc-123")'
 
 | Issue | Solution |
 |-------|----------|
-| `ModuleNotFoundError` | Ensure `pip install -e ".[dev]"` in backend |
+| `ModuleNotFoundError` | Ensure `uv sync --all-groups` in backend |
 | `ImportError` circular | Check for missing protocols, use `TYPE_CHECKING` |
 | Database connection failed | Verify `DATABASE_URL` in `.env`, check container health |
 | Redis connection failed | Verify `REDIS_URL`, check container health |
@@ -455,7 +456,7 @@ docker logs twib-backend | jq 'select(.correlation_id=="abc-123")'
 ```bash
 # Backend profiling
 cd backend
-python -m cProfile -o profile.stats -m uvicorn backend.core.app:app
+python -m cProfile -o profile.stats -m uvicorn app.main:app
 # Analyze with snakeviz
 snakeviz profile.stats
 
