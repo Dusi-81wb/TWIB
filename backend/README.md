@@ -34,7 +34,10 @@ domain (the User aggregate root built from the value objects, with user
 statuses, roles, domain events, and business-rule exceptions), and the
 Phase 2.4 organization domain (the Organization aggregate root with
 memberships, membership statuses, subscription plans, organization
-statuses, domain events, and business-rule exceptions).
+statuses, domain events, and business-rule exceptions), and the Phase 2.5
+workspace domain (the Workspace aggregate root with memberships, workspace
+roles, immutable settings, workspace statuses, domain events, and
+business-rule exceptions).
 
 ## Structure
 
@@ -95,6 +98,7 @@ backend/
 │   │   │   ├── email.py       # Email
 │   │   │   ├── name.py        # Name
 │   │   │   ├── slug.py        # Slug
+│   │   │   ├── description.py # Description
 │   │   │   ├── timestamp.py   # Timestamp
 │   │   │   ├── url.py         # Url
 │   │   │   ├── version.py     # Version
@@ -115,6 +119,14 @@ backend/
 │   │       ├── status.py       # OrganizationStatus
 │   │       ├── events.py       # Organization domain events
 │   │       └── exceptions.py   # Organization business-rule exceptions
+│   │   └── workspaces/         # Workspace domain aggregate
+│   │       ├── __init__.py     # Public workspace domain exports
+│   │       ├── workspace.py    # Workspace aggregate root
+│   │       ├── membership.py   # WorkspaceMembership, WorkspaceRole, status
+│   │       ├── settings.py     # WorkspaceSettings, WorkspaceVisibility
+│   │       ├── status.py       # WorkspaceStatus
+│   │       ├── events.py       # Workspace domain events
+│   │       └── exceptions.py   # Workspace business-rule exceptions
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -323,6 +335,7 @@ can be reused by every future module (Clean Architecture).
 | `value_objects/` | Concrete, reusable value objects (package)        |
 | `users/`         | User aggregate, roles, statuses, events, exceptions |
 | `organizations/` | Organization aggregate, memberships, plans, statuses, events, exceptions |
+| `workspaces/`    | Workspace aggregate, memberships, settings, statuses, events, exceptions |
 
 ### Entities
 
@@ -387,9 +400,10 @@ Pydantic, or SQLAlchemy); immutability is enforced by overriding
 | File         | Class          | Stores / validates                                          |
 | ------------ | -------------- | ----------------------------------------------------------- |
 | `id.py`      | `UuidIdentity` | A UUID4 entity identity; `generate()` and `parse()` helpers |
-| `email.py`   | `Email`        | A normalized, syntactically valid email address             |
-| `name.py`    | `Name`         | A trimmed, non-empty display name (max 120 characters)      |
-| `slug.py`    | `Slug`         | A lowercase URL-friendly slug (`a-z0-9` and single hyphens) |
+| `email.py`    | `Email`        | A normalized, syntactically valid email address             |
+| `name.py`     | `Name`         | A trimmed, non-empty display name (max 120 characters)      |
+| `slug.py`     | `Slug`         | A lowercase URL-friendly slug (`a-z0-9` and single hyphens) |
+| `description.py`| `Description` | A trimmed free-text description (max 500 characters; may be empty) |
 | `timestamp.py`| `Timestamp`   | A timezone-aware UTC moment; `now()` and `parse()` helpers  |
 | `url.py`     | `Url`          | An absolute `http`/`https` URL                              |
 | `version.py` | `Version`      | A `major.minor.patch` semantic version; `parse()` helper    |
@@ -648,6 +662,163 @@ business-rule exceptions, all subclasses of `BusinessRuleViolation`:
 | `DuplicateMember`         | A user is added as an active member twice |
 | `MembershipAlreadyExists` | A pending membership exists for the user  |
 | `OwnerCannotBeRemoved`    | The owner is removed without transfer     |
+
+### Workspace Aggregate
+
+The collaboration boundary inside an organization is the `Workspace` aggregate
+root in `app/domain/workspaces/`, imported from a single location:
+
+```python
+from app.domain.workspaces import (
+    Workspace,
+    WorkspaceMembershipStatus,
+    WorkspaceRole,
+    WorkspaceSettings,
+    WorkspaceStatus,
+    WorkspaceVisibility,
+)
+from app.domain.value_objects import Description, Name, Slug, UuidIdentity
+```
+
+`Workspace` extends `AggregateRoot` and is built entirely from the Phase 2.2
+value objects (including `Description`), the `WorkspaceStatus` enum, the
+immutable `WorkspaceSettings` domain object, and a collection of immutable
+`WorkspaceMembership` domain objects. Its state is exposed only through
+read-only properties, and every change goes through a domain method that
+validates the operation, records a domain event, and bumps the version:
+
+| Property          | Type                       | Meaning                               |
+| ----------------- | -------------------------- | ------------------------------------- |
+| `workspace_id`    | `UuidIdentity`             | Stable UUID identity of the workspace |
+| `organization_id` | `UuidIdentity`             | Identity of the parent organization   |
+| `name`            | `Name`                     | The workspace's name                  |
+| `slug`            | `Slug`                     | URL-friendly slug                     |
+| `description`     | `Description`              | Free-text description (may be empty)  |
+| `owner_id`        | `UuidIdentity`             | Identity of the workspace owner       |
+| `created_at`      | `Timestamp`                | When the workspace was created (UTC)  |
+| `updated_at`      | `Timestamp`                | When the workspace was last changed (UTC) |
+| `status`          | `WorkspaceStatus`          | Current lifecycle state               |
+| `settings`        | `WorkspaceSettings`        | Immutable workspace configuration     |
+| `metadata`        | `Metadata`                 | Key/value metadata map (immutable)    |
+| `version`         | `Version`                  | Optimistic-locking version (auto-bumped) |
+| `members`         | `tuple[WorkspaceMembership, ...]` | Current memberships            |
+
+```python
+org = Organization(
+    organization_id=UuidIdentity.generate(),
+    name=Name("Acme Corp"),
+    slug=Slug("acme"),
+    owner_id=owner_id,
+)
+ws = Workspace(
+    workspace_id=UuidIdentity.generate(),
+    organization_id=org.organization_id,
+    name=Name("Sales"),
+    slug=Slug("sales"),
+    description=Description("The sales workspace"),
+    owner_id=owner_id,
+)
+ws.activate()
+ws.add_member(member_id, role=WorkspaceRole.EDITOR)
+for event in ws.pull_domain_events():
+    pass  # publishing is done by an outer layer
+```
+
+The owner is implicitly added as an active OWNER-role member at construction.
+The domain methods are `rename()`, `change_slug()`, `change_description()`,
+`change_owner()`, `archive()`, `restore()`, `activate()`, `suspend()`,
+`add_member()`, `remove_member()`, `update_settings()`, `update_metadata()`,
+and `increment_version()`. Every successful mutation refreshes `updated_at`
+and bumps `version` (one patch); call `increment_version()` directly only for
+out-of-band changes. `get_member(user_id)` returns a membership or `None`.
+
+An archived workspace is immutable until `restore()` is called (every mutation
+raises `WorkspaceArchived`), and a deleted workspace cannot be modified at all.
+
+#### Workspace Memberships
+
+`WorkspaceMembership` (in `app/domain/workspaces/membership.py`) is an
+immutable domain object describing a user's membership in a workspace. It is
+not an aggregate; it exists inside the workspace aggregate:
+
+| Field                | Type                       | Meaning                              |
+| -------------------- | -------------------------- | ------------------------------------ |
+| `user_id`            | `UuidIdentity`             | Identity of the member               |
+| `role`               | `WorkspaceRole`            | Role the member holds                |
+| `joined_at`          | `Timestamp`                | When the membership started (UTC)    |
+| `status`             | `WorkspaceMembershipStatus`| Current membership state             |
+| `invitation_accepted`| `bool`                     | Whether the invitation was accepted  |
+
+`WorkspaceRole` is a `StrEnum` (`owner`, `admin`, `editor`, `contributor`,
+`viewer`); permissions are intentionally not modelled yet.
+`WorkspaceMembershipStatus` is a `StrEnum` (`pending`, `active`, `inactive`).
+A pending membership cannot have an accepted invitation and vice versa; the
+constructor enforces this with `InvalidValue`. Memberships are compared and
+hashed by value and cannot be mutated after construction.
+
+#### Workspace Settings
+
+`WorkspaceSettings` (in `app/domain/workspaces/settings.py`) is an immutable
+configuration object for a workspace:
+
+| Field                   | Type                       | Meaning                               |
+| ----------------------- | -------------------------- | ------------------------------------- |
+| `timezone`              | `str`                      | Workspace timezone (default `UTC`)    |
+| `default_language`      | `str`                      | Default language (default `en`)       |
+| `visibility`            | `WorkspaceVisibility`      | Visibility (default PRIVATE)          |
+| `ai_model_preference`   | `str`                      | AI model routing hint (default `auto`)|
+| `execution_limits`      | `int`                      | Max concurrent executions (default 5) |
+| `knowledge_base_enabled`| `bool`                     | Knowledge base toggle (default False) |
+| `experimental_features` | `bool`                     | Experimental features (default False) |
+
+`WorkspaceVisibility` is a `StrEnum` (`private`, `organization`, `public`).
+Settings are validated at construction, compared and hashed by value, and
+cannot be mutated after construction. No infrastructure (databases, caches,
+LLM clients) is involved.
+
+#### Workspace Statuses
+
+`WorkspaceStatus` (in `app/domain/workspaces/status.py`) is a `StrEnum`:
+
+| Status      | Value         | Meaning                                   |
+| ----------- | ------------- | ----------------------------------------- |
+| `ACTIVE`    | `"active"`    | Active and usable (default)               |
+| `ARCHIVED`  | `"archived"`  | Archived; immutable until restored        |
+| `SUSPENDED` | `"suspended"` | Temporarily suspended                     |
+| `DELETED`   | `"deleted"`   | Deleted; terminal state                   |
+
+#### Workspace Domain Events
+
+`app/domain/workspaces/events.py` defines the domain events, all subclasses of
+`DomainEvent` that carry the affected `workspace_id`:
+
+| Event                       | Recorded by                                 |
+| --------------------------- | ------------------------------------------- |
+| `WorkspaceCreated`          | construction of a new workspace (carries the organization ID) |
+| `WorkspaceArchived`         | `archive()`                                 |
+| `WorkspaceRenamed`          | `rename()` (carries new and previous names) |
+| `WorkspaceOwnerChanged`     | `change_owner()` (carries new/previous)     |
+| `WorkspaceMemberAdded`      | `add_member()` (carries the member role)    |
+| `WorkspaceMemberRemoved`    | `remove_member()` (carries the user ID)     |
+| `WorkspaceSettingsChanged`  | `update_settings()` (carries new/previous)  |
+
+Note that `WorkspaceArchived` names both an event (in `events.py`) and an
+exception (in `exceptions.py`); the package-level `WorkspaceArchived` export is
+the exception, while the event is imported from `app.domain.workspaces.events`.
+The aggregate only records events; there is no event bus in this phase.
+
+#### Workspace Business-Rule Exceptions
+
+`app/domain/workspaces/exceptions.py` defines the workspace business-rule
+exceptions, all subclasses of `BusinessRuleViolation`:
+
+| Exception                 | Raised when                                 |
+| ------------------------- | ------------------------------------------- |
+| `InvalidWorkspaceState`   | An operation is invalid in the current state |
+| `WorkspaceArchived`       | An archived workspace is modified before restore |
+| `WorkspaceAlreadyExists`  | A workspace already exists (repository/application layer) |
+| `DuplicateWorkspaceMember`| A user is added as a member twice           |
+| `OwnerCannotBeRemoved`    | The owner is removed without transfer       |
 
 ### Domain Events
 
@@ -1428,6 +1599,14 @@ deferred until those subsystems exist.
   OWNER-role member; archived organizations are immutable until restored. No
   billing, plan-limit, database, repository, or API code exists in the domain
   layer.
+- The workspace domain in `app/domain/workspaces/` models the `Workspace`
+  aggregate root (built from the value objects, with `WorkspaceStatus`,
+  `WorkspaceRole`/`WorkspaceMembershipStatus` enums, the immutable
+  `WorkspaceSettings` domain object, immutable `WorkspaceMembership` domain
+  objects, workspace domain events, and workspace business-rule exceptions).
+  The owner is an implicit active OWNER-role member; archived workspaces are
+  immutable until restored. No infrastructure (databases, caches, LLM
+  clients), repository, or API code exists in the domain layer.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

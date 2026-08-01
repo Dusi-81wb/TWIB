@@ -29,7 +29,7 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        ██████████████░░░░░░  70%
+Domain Layer        █████████████████░░░░  85%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -49,8 +49,8 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 ```
 
 > Domain Layer: Phases 2.1 (base classes, exceptions), 2.2 (concrete
-> value objects), 2.3 (user domain), and 2.4 (organization domain) are
-> complete; the workspace domain follows in Phase 2.5.
+> value objects), 2.3 (user domain), 2.4 (organization domain), and 2.5
+> (workspace domain) are complete; repository interfaces follow in Phase 2.6.
 
 ---
 
@@ -62,7 +62,7 @@ Sprint 2
 
 # Current Phase
 
-Phase 2.5 — Workspace Domain
+Phase 2.6 — Repository Interfaces
 
 ---
 
@@ -74,68 +74,74 @@ Phase 2.5 — Workspace Domain
 
 # Current Objective
 
-Implement the Workspace domain aggregate on top of the domain foundation,
-the Phase 2.2 value objects, and the Phase 2.3/2.4 user and organization
-domains, establishing the pattern concrete workspaces follow.
+Define the repository interfaces for the domain aggregates (user, organization,
+workspace) as framework-independent protocols, establishing the persistence
+contracts application services depend on.
 
 Do NOT implement
 
+- Database models
+- SQLAlchemy
+- Repository implementations
+- API routes
 - Authentication
-- Database
-- FastAPI routes
-- Repositories
-- ORM
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 2.4
+✅ Phase 2.5
 
 Completed
 
-- `backend/app/domain/organizations/` package with six files (`__init__.py`,
-  `organization.py`, `membership.py`, `plan.py`, `status.py`, `events.py`,
+- `backend/app/domain/workspaces/` package with six files (`__init__.py`,
+  `workspace.py`, `membership.py`, `settings.py`, `status.py`, `events.py`,
   `exceptions.py`)
-- `Organization` aggregate root built entirely from the Phase 2.2 value
-  objects (`UuidIdentity`, `Name`, `Slug`, `Timestamp`, `Metadata`,
-  `Version`) and the `OrganizationStatus`/`SubscriptionPlan` enums
-- Immutable `OrganizationMembership` domain object (user ID, role, joined
-  time, membership status, invitation-accepted flag) plus the
-  `MembershipStatus` `StrEnum` (pending, active, inactive)
-- `OrganizationStatus` `StrEnum` (pending, active, suspended, archived,
-  deleted) and `SubscriptionPlan` `StrEnum` (free, starter, professional,
-  enterprise, custom)
-- Organization domain events (`OrganizationCreated`, `OrganizationRenamed`,
-  `OrganizationActivated`, `OrganizationSuspended`, `MemberAdded`,
-  `MemberRemoved`, `OwnerChanged`, `PlanChanged`)
-- Organization business-rule exceptions (`InvalidOrganizationState`,
-  `OrganizationArchived`, `DuplicateMember`, `MembershipAlreadyExists`,
+- `Workspace` aggregate root built entirely from the Phase 2.2 value objects
+  (`UuidIdentity`, `Name`, `Slug`, `Description`, `Timestamp`, `Metadata`,
+  `Version`), the `WorkspaceStatus` enum, and the `WorkspaceSettings` domain
+  object
+- Immutable `WorkspaceMembership` domain object (user ID, workspace role,
+  joined time, membership status, invitation-accepted flag) plus the
+  `WorkspaceRole` `StrEnum` (owner, admin, editor, contributor, viewer) and
+  `WorkspaceMembershipStatus` `StrEnum` (pending, active, inactive)
+- Immutable `WorkspaceSettings` domain object (timezone, default language,
+  visibility, AI model preference, execution limits, knowledge-base toggle,
+  experimental-features toggle) plus the `WorkspaceVisibility` `StrEnum`
+  (private, organization, public)
+- `WorkspaceStatus` `StrEnum` (active, archived, suspended, deleted)
+- Workspace domain events (`WorkspaceCreated`, `WorkspaceArchived`,
+  `WorkspaceRenamed`, `WorkspaceOwnerChanged`, `WorkspaceMemberAdded`,
+  `WorkspaceMemberRemoved`, `WorkspaceSettingsChanged`)
+- Workspace business-rule exceptions (`InvalidWorkspaceState`,
+  `WorkspaceArchived`, `WorkspaceAlreadyExists`, `DuplicateWorkspaceMember`,
   `OwnerCannotBeRemoved`)
-- Domain methods (`rename`, `change_slug`, `change_plan`, `activate`,
-  `suspend`, `archive`, `restore`, `add_member`, `remove_member`,
-  `change_owner`, `update_metadata`, `increment_version`) that validate,
-  record events, refresh `updated_at`, and auto-bump the
-  optimistic-locking version
+- Domain methods (`rename`, `change_slug`, `change_description`, `change_owner`,
+  `archive`, `restore`, `activate`, `suspend`, `add_member`, `remove_member`,
+  `update_settings`, `update_metadata`, `increment_version`) that validate,
+  record events, refresh `updated_at`, and auto-bump the optimistic-locking
+  version
 - The owner is implicitly added as an active OWNER-role member; the owner
   cannot be removed, and changing the owner swaps roles (new owner becomes
   OWNER, previous owner becomes ADMIN)
-- Archived organizations are immutable until restored; deleted
-  organizations cannot be modified
+- Archived workspaces are immutable until restored; deleted workspaces cannot
+  be modified
+- New `Description` value object (`backend/app/domain/value_objects/description.py`)
+  for free-text descriptions (max 500 characters; may be empty)
 - Pure Python with no FastAPI, Pydantic, SQLAlchemy, repositories, billing,
-  plan-limit, or authentication code
-- `backend/README.md` documents the organization aggregate, memberships,
-  plans, statuses, domain events, and business-rule exceptions
+  infrastructure, or authentication code
+- `backend/README.md` documents the workspace aggregate, memberships, settings,
+  statuses, domain events, and business-rule exceptions
 
-(Previous: ✅ Phase 2.3)
+(Previous: ✅ Phase 2.4)
 
 ---
 
 # Next Milestone
 
-Phase 2.5
+Phase 2.6
 
-Workspace Domain
+Repository Interfaces
 
 ---
 
@@ -272,13 +278,15 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/organizations/__init__.py (created)
-- backend/app/domain/organizations/organization.py (created)
-- backend/app/domain/organizations/membership.py (created)
-- backend/app/domain/organizations/plan.py (created)
-- backend/app/domain/organizations/status.py (created)
-- backend/app/domain/organizations/events.py (created)
-- backend/app/domain/organizations/exceptions.py (created)
+- backend/app/domain/value_objects/description.py (created)
+- backend/app/domain/value_objects/__init__.py (exported `Description`)
+- backend/app/domain/workspaces/__init__.py (created)
+- backend/app/domain/workspaces/workspace.py (created)
+- backend/app/domain/workspaces/membership.py (created)
+- backend/app/domain/workspaces/settings.py (created)
+- backend/app/domain/workspaces/status.py (created)
+- backend/app/domain/workspaces/events.py (created)
+- backend/app/domain/workspaces/exceptions.py (created)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -455,11 +463,21 @@ _Not committed yet_
 
 ## Phase 2.5
 
-- [ ] Workspace domain package (`backend/app/domain/workspaces/`)
-- [ ] Workspace aggregate root
-- [ ] Workspace membership and roles
-- [ ] Workspace domain events and invariants
-- [ ] README documentation for the workspace domain
+- [x] Workspace domain package (`backend/app/domain/workspaces/`)
+- [x] Workspace aggregate root
+- [x] Workspace membership and roles
+- [x] Workspace settings domain object
+- [x] Workspace domain events and invariants
+- [x] `Description` value object
+- [x] README documentation for the workspace domain
+
+## Phase 2.6
+
+- [ ] Repository interfaces package (`backend/app/domain/repositories/`)
+- [ ] `UserRepository` protocol
+- [ ] `OrganizationRepository` protocol
+- [ ] `WorkspaceRepository` protocol
+- [ ] README documentation for the repository interfaces
 
 ---
 
@@ -618,11 +636,19 @@ Completed
   memberships, subscription plans, organization statuses, domain events,
   business-rule exceptions)
 
+Session 19
+
+Completed
+
+- Phase 2.5 Workspace Domain (Workspace aggregate root, immutable
+  memberships and settings, workspace roles and statuses, domain events,
+  business-rule exceptions, Description value object)
+
 Next Session
 
-Phase 2.5
+Phase 2.6
 
-Workspace Domain
+Repository Interfaces
 
 ---
 
@@ -1038,6 +1064,153 @@ None
 - The `Organization` constructor accepts optional `created_at`, `updated_at`,
   `status`, `subscription_plan`, `metadata`, and `version` so outer layers
   can reconstruct aggregates from storage; there is no persistence code yet.
+- `folder_structure.md` still lists `app/models/` as the future home of
+  domain models; the implemented home is `app/domain/`. The docs can be
+  aligned when the roadmap is next updated.
+
+---
+
+# Phase 2.5 Summary
+
+## Files Created
+
+- backend/app/domain/value_objects/description.py
+- backend/app/domain/workspaces/__init__.py
+- backend/app/domain/workspaces/workspace.py
+- backend/app/domain/workspaces/membership.py
+- backend/app/domain/workspaces/settings.py
+- backend/app/domain/workspaces/status.py
+- backend/app/domain/workspaces/events.py
+- backend/app/domain/workspaces/exceptions.py
+
+## Files Modified
+
+- backend/app/domain/value_objects/__init__.py (exported `Description`)
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `Workspace` extends `AggregateRoot[uuid.UUID]` and is built entirely from
+  the Phase 2.2 value objects (`UuidIdentity`, `Name`, `Slug`,
+  `Description`, `Timestamp`, `Metadata`, `Version`), the `WorkspaceStatus`
+  enum, and the `WorkspaceSettings` domain object; state is exposed only
+  through read-only properties.
+- Construction implicitly adds the owner as an active OWNER-role member and
+  records a `WorkspaceCreated` event carrying the parent organization ID;
+  `pull_domain_events()` returns events in order and clears the record.
+- `rename()`, `change_slug()`, `change_description()`, `update_settings()`,
+  and `update_metadata()` are no-ops when the new value equals the current
+  one.
+- `activate()` raises `InvalidWorkspaceState` when already active; a
+  suspended workspace becomes active. `suspend()` raises
+  `InvalidWorkspaceState` when already suspended.
+- `archive()` raises `WorkspaceArchived` when already archived and records a
+  `WorkspaceArchived` event; `restore()` raises `InvalidWorkspaceState` when
+  not archived.
+- An archived workspace is immutable: every later mutation raises
+  `WorkspaceArchived` until `restore()`.
+- `add_member()` raises `DuplicateWorkspaceMember` for an existing member;
+  `remove_member()` raises `OwnerCannotBeRemoved` for the owner and
+  `InvalidWorkspaceState` for a non-member.
+- `change_owner()` only accepts an existing member (else
+  `InvalidWorkspaceState`), records `WorkspaceOwnerChanged` with new and
+  previous owner IDs, and swaps roles (new owner becomes OWNER, previous
+  owner becomes ADMIN).
+- `WorkspaceMembership` is immutable (raises `TypeError` on assignment) and
+  its constructor rejects an accepted invitation in the PENDING state and a
+  non-pending membership without an accepted invitation (`InvalidValue`);
+  memberships compare and hash by value.
+- `WorkspaceSettings` is immutable (raises `TypeError` on assignment),
+  validates non-empty strings and a non-negative execution limit
+  (`InvalidValue`), and compares and hashes by value.
+- Every successful mutation refreshes `updated_at` and bumps `version` by
+  one patch; `increment_version()` exposes an explicit bump.
+- `WorkspaceStatus`, `WorkspaceRole`, `WorkspaceMembershipStatus`, and
+  `WorkspaceVisibility` are `StrEnum`s with the documented members.
+- `Description` trims the value, allows an empty description, and enforces a
+  500-character maximum length.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain`.
+- A runtime smoke test (creation, owner auto-membership, every domain
+  method, each event, every exception path, and version bumping) succeeds.
+- No authentication, billing, plan-limit, database model, repository, API
+  route, or external dependency was added.
+
+## Architectural Decisions
+
+- `Workspace` subclasses `AggregateRoot[uuid.UUID]` and bridges to the base's
+  identity contract with the generic `Identity(workspace_id.value)`;
+  the canonical identifier exposed to callers is the `UuidIdentity` value
+  object via the `workspace_id` property (same pattern as `User` and
+  `Organization`).
+- The aggregate's state lives in private fields and is exposed only through
+  read-only properties; mutability happens exclusively through domain methods
+  that enforce business rules, so no mutable attribute is exposed directly.
+- The owner is an implicit, always-present active OWNER-role member. The
+  owner cannot be removed (`OwnerCannotBeRemoved`); ownership transfers via
+  `change_owner()` which swaps roles so the workspace always retains exactly
+  one owner.
+- Memberships are immutable domain objects stored privately in a
+  `dict[UuidIdentity, WorkspaceMembership]` and exposed as a tuple;
+  `get_member()` provides lookup. Membership is a domain object only, not an
+  aggregate.
+- Workspace configuration is an immutable `WorkspaceSettings` domain object
+  (not a value object per field), so the whole configuration can be replaced
+  atomically through `update_settings()` and compared by value.
+- Optimistic locking mirrors the user and organization aggregates: every
+  successful domain method calls `_touch()` (refresh `updated_at`, bump the
+  version), and `increment_version()` is provided for explicit out-of-band
+  bumps.
+- `WorkspaceStatus`, `WorkspaceRole`, `WorkspaceMembershipStatus`, and
+  `WorkspaceVisibility` are `StrEnum`s (per the Phase 1.8 UP042 convention);
+  workspace permissions are intentionally out of scope.
+- `Description` is a Phase 2.2-style value object added to
+  `app/domain/value_objects/` so it is reusable by later aggregates (for
+  example workflows and projects).
+- Workspace domain exceptions subclass `BusinessRuleViolation`, matching
+  their semantics as enterprise business-rule violations.
+- Workspace events subclass `DomainEvent` and carry the affected
+  `workspace_id` plus new and previous values for the change events
+  (`WorkspaceRenamed`, `WorkspaceOwnerChanged`, `WorkspaceSettingsChanged`),
+  so consumers have everything they need without querying state.
+- `WorkspaceArchived` names both a domain event and a business-rule
+  exception. The package-level export is the exception; the event is imported
+  from `app.domain.workspaces.events` to avoid the name collision.
+
+## Suggestions (Not Implemented)
+
+- No unit tests were added in this phase (running the pytest tooling is out
+  of scope per the phase rules). A future phase should add
+  `backend/tests/domain/` unit tests covering the value objects and the user,
+  organization, and workspace aggregates.
+- `change_slug()`, `change_description()`, `activate()`, `suspend()`, and
+  `restore()` do not emit domain events (the phase specified exactly seven
+  events). A future phase can add `WorkspaceSlugChanged`,
+  `WorkspaceActivated`, `WorkspaceSuspended`, and `WorkspaceRestored` events
+  for full auditability.
+- `WorkspaceAlreadyExists` is defined but is not raised by the aggregate
+  itself; detecting a duplicate workspace (for example a shared slug)
+  requires the application/repository layer and will land with the database
+  phase.
+- `add_member()` only creates ACTIVE members. Invitation flows (creating
+  PENDING memberships and later accepting them) require an application
+  service and will land with the database phase; the `WorkspaceRole` and
+  `WorkspaceMembershipStatus` enums already support pending memberships.
+- Membership removal is immediate (`remove_member()` deletes the
+  membership). A soft-delete or `INACTIVE`-transition flow can be added once
+  persistence exists.
+- `WorkspaceSettings` stores primitives (timezone, language, visibility,
+  model preference, limits, toggles). No plan limits, entitlements, or
+  per-plan settings validation is modelled; billing logic belongs to a future
+  billing phase.
+- The `Workspace` constructor accepts optional `created_at`, `updated_at`,
+  `status`, `settings`, `metadata`, and `version` so outer layers can
+  reconstruct aggregates from storage; there is no persistence code yet.
 - `folder_structure.md` still lists `app/models/` as the future home of
   domain models; the implemented home is `app/domain/`. The docs can be
   aligned when the roadmap is next updated.
