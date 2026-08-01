@@ -9,9 +9,10 @@ management), the Phase 1.2 configuration system (typed settings loaded from
 environment variables), the Phase 1.3 structured logging system
 (structlog with environment-aware rendering), the Phase 1.4 dependency
 injection container (dependency-injector with container-backed FastAPI
-dependencies), and the Phase 1.5 global exception handling system
+dependencies), the Phase 1.5 global exception handling system
 (consistent JSON error responses for application, validation, HTTP, and
-unhandled errors).
+unhandled errors), and the Phase 1.6 middleware infrastructure (request
+IDs, security headers, and settings-driven CORS).
 
 ## Structure
 
@@ -37,6 +38,12 @@ backend/
 │   │   ├── error_codes.py   # Machine-readable error codes
 │   │   ├── exceptions.py    # Application exception hierarchy
 │   │   └── handlers.py      # Global exception handlers
+│   ├── middleware/
+│   │   ├── __init__.py        # Middleware package exports
+│   │   ├── cors.py            # CORS from application settings
+│   │   ├── request_id.py      # X-Request-ID generation
+│   │   ├── security_headers.py# Security response headers
+│   │   └── registration.py    # Central middleware registration
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -284,6 +291,54 @@ raise NotFoundException("Workflow not found.")
 `create_application()` in `app/application.py`. No handler is registered
 twice, and no middleware is involved.
 
+## Middleware
+
+Middleware lives in `app/middleware/`. All middleware is registered
+centrally by `register_middlewares(application, settings)` in
+`app/middleware/registration.py`, which the application factory calls once.
+No middleware is added directly in `app/application.py`.
+
+The effective request/response order (outermost first) is:
+
+1. Security headers
+2. Request ID
+3. CORS
+
+### Request IDs
+
+`RequestIDMiddleware` in `app/middleware/request_id.py`:
+
+- Generates a unique `UUID4` for every request.
+- Stores it on `request.state.request_id`.
+- Binds it to the structured log context as `request_id`, so every log
+  event for the request carries it.
+- Echoes the same value back in the `X-Request-ID` response header.
+
+### Security Headers
+
+`SecurityHeadersMiddleware` in `app/middleware/security_headers.py` adds
+these headers to every response:
+
+| Header                    | Value                        |
+| ------------------------- | ---------------------------- |
+| `X-Content-Type-Options`  | `nosniff`                    |
+| `X-Frame-Options`         | `DENY`                       |
+| `Referrer-Policy`         | `no-referrer`                |
+| `X-XSS-Protection`        | `1; mode=block`              |
+
+Content Security Policy (CSP) is intentionally deferred to a later phase.
+
+### CORS
+
+CORS is configured in `app/middleware/cors.py` using FastAPI's
+`CORSMiddleware`. Allowed origins are read from the `CORS_ORIGINS` setting
+(`settings.cors_origins`) and are never hardcoded:
+
+```bash
+# backend/.env
+CORS_ORIGINS=["https://app.example.com"]
+```
+
 ## How to Install
 
 Prerequisites:
@@ -349,9 +404,12 @@ Interactive API documentation is available at:
 - Global exception handlers are registered once in `create_application()`
   through `register_exception_handlers()` and return a consistent JSON
   error response without exposing tracebacks.
-- Logging, dependency injection, and exception handling are the
-  cross-cutting infrastructure implemented so far. Middleware,
-  authentication, and request logging are intentionally deferred to later
-  phases.
+- Middleware is registered once in `create_application()` through
+  `register_middlewares()`. Every request receives a `UUID4` request ID,
+  security headers are applied to every response, and CORS reads origins
+  from settings.
+- Logging, dependency injection, exception handling, and middleware are
+  the cross-cutting infrastructure implemented so far. Authentication and
+  request logging are intentionally deferred to later phases.
 - Follow the project coding guidelines (PEP 8, type hints, Google-style
   docstrings). Do not add code outside the current phase.

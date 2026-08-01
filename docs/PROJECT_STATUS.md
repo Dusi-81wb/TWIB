@@ -27,7 +27,7 @@ Architecture        ████████████████████
 
 Documentation       ████████████████████ 100%
 
-Foundation          ████████████████░░░░  60%
+Foundation          ████████████████████  80%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -56,7 +56,7 @@ Sprint 1
 
 # Current Phase
 
-Phase 1.6 — Middleware
+Phase 1.7 — API Foundation
 
 ---
 
@@ -68,7 +68,7 @@ Phase 1.6 — Middleware
 
 # Current Objective
 
-Implement application middleware for the FastAPI backend.
+Implement the foundational API layer for the FastAPI backend.
 
 Do NOT implement
 
@@ -82,34 +82,32 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 1.5
+✅ Phase 1.6
 
 Completed
 
-- Base `TWIBException` with `error_code`, `message`, `status_code`, and
-  optional `details`
-- Generic exceptions: `ValidationException`, `UnauthorizedException`,
-  `ForbiddenException`, `NotFoundException`, `ConflictException`,
-  `ServiceUnavailableException`, `InternalServerException`
-- Central error code registry in `app/core/error_codes.py`
-- Global handlers for `TWIBException`, `RequestValidationError`,
-  `HTTPException`, and unhandled `Exception` in `app/core/handlers.py`
-- Consistent JSON error contract: `{"success": false, "error": {...}}`
-- Tracebacks never exposed to clients; unexpected failures logged
-  server-side with full context
-- Handlers registered once in `create_application()` via
-  `register_exception_handlers()`
-- `backend/README.md` documents the error handling system
+- Reusable middleware package in `app/middleware/`
+- `RequestIDMiddleware` assigns a `UUID4` to every request, stores it on
+  `request.state.request_id`, binds it to the structured log context, and
+  echoes it in the `X-Request-ID` response header
+- `SecurityHeadersMiddleware` adds `X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, and `X-XSS-Protection` to every
+  response (CSP deferred)
+- CORS configured from `settings.cors_origins` using FastAPI
+  `CORSMiddleware`; no hardcoded origins
+- Central `register_middlewares(application, settings)`; the application
+  factory calls only this function
+- `backend/README.md` documents request IDs, security headers, and CORS
 
-(Previous: ✅ Phase 1.4 — Dependency injection)
+(Previous: ✅ Phase 1.5 — Global exception handling)
 
 ---
 
 # Next Milestone
 
-Phase 1.6
+Phase 1.7
 
-Middleware
+API Foundation
 
 ---
 
@@ -246,9 +244,11 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/core/error_codes.py
-- backend/app/core/exceptions.py
-- backend/app/core/handlers.py
+- backend/app/middleware/__init__.py
+- backend/app/middleware/cors.py
+- backend/app/middleware/request_id.py
+- backend/app/middleware/security_headers.py
+- backend/app/middleware/registration.py
 - backend/app/application.py
 - backend/README.md
 - docs/PROJECT_STATUS.md
@@ -256,8 +256,10 @@ _Not committed yet_
 (Also in this sprint: backend/pyproject.toml, backend/app/container.py,
 backend/app/dependencies.py, backend/app/core/settings.py,
 backend/app/core/config.py, backend/app/core/environments.py,
-backend/app/core/logging.py, backend/.env.example, backend/app/lifecycle.py,
-backend/uv.lock — from the previous Phase 1.1-1.4 sessions.)
+backend/app/core/logging.py, backend/app/core/error_codes.py,
+backend/app/core/exceptions.py, backend/app/core/handlers.py,
+backend/.env.example, backend/app/lifecycle.py, backend/uv.lock — from the
+previous Phase 1.1-1.5 sessions.)
 
 # Pending Tasks
 
@@ -303,6 +305,16 @@ backend/uv.lock — from the previous Phase 1.1-1.4 sessions.)
 - [x] Consistent JSON error responses
 - [x] No tracebacks exposed to clients
 - [x] README documentation for error handling
+
+## Phase 1.6
+
+- [x] Middleware package (`app/middleware/`)
+- [x] Request ID middleware (UUID4, `request.state.request_id`, header)
+- [x] Security headers middleware
+- [x] Settings-driven CORS
+- [x] Central `register_middlewares()` registration
+- [x] Application factory calls `register_middlewares()` only
+- [x] README documentation for middleware
 
 ---
 
@@ -384,11 +396,75 @@ Completed
 
 - Phase 1.5 Exception Handling
 
+Session 7
+
+Completed
+
+- Phase 1.6 Middleware
+
 Next Session
 
-Phase 1.6
+Phase 1.7
 
-Middleware
+API Foundation
+
+---
+
+# Phase 1.6 Summary
+
+## Files Created
+
+- backend/app/middleware/__init__.py
+- backend/app/middleware/cors.py
+- backend/app/middleware/request_id.py
+- backend/app/middleware/security_headers.py
+- backend/app/middleware/registration.py
+
+## Files Modified
+
+- backend/app/application.py
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `RequestIDMiddleware` generates a `UUID4`, stores it on
+  `request.state.request_id`, binds it to the log context, and returns it
+  in the `X-Request-ID` response header.
+- `SecurityHeadersMiddleware` adds `X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, and `X-XSS-Protection` to every
+  response.
+- CORS reads origins exclusively from `settings.cors_origins`; no origins
+  are hardcoded.
+- `register_middlewares()` is the only middleware registration point and is
+  called once by `create_application()`.
+- Effective middleware order (outermost first): security headers, request
+  ID, CORS.
+- No authentication, rate limiting, database, metrics, compression, or
+  caching middleware was added.
+
+---
+
+# Suggestions (Not Implemented)
+
+- `X-XSS-Protection` is deprecated in modern browsers and is only retained
+  because this phase requires it. Consider dropping it (or replacing it
+  with a proper Content-Security-Policy) once the CSP phase is implemented.
+- The request ID middleware always generates a fresh `UUID4`. Honoring an
+  inbound `X-Request-ID` (falling back to `UUID4` when absent) would
+  improve correlation with upstream gateways for distributed tracing.
+- `RequestIDMiddleware` and `SecurityHeadersMiddleware` are built on
+  Starlette's `BaseHTTPMiddleware`. For very high throughput, equivalent
+  pure-ASGI middleware avoids a small per-request overhead.
+- Security headers could also be emitted at the reverse proxy / CDN layer
+  in production for defense in depth.
+- The empty top-level `backend/middleware/` scaffolding directory (README
+  only) overlaps conceptually with `app/middleware/` and could be removed
+  or consolidated to avoid confusion.
 
 ---
 
@@ -540,6 +616,8 @@ feat(phase-1.3): add structured logging
 feat(phase-1.4): implement dependency injection
 
 feat(phase-1.5): add global exception handling
+
+feat(phase-1.6): add middleware infrastructure
 ```
 
 ---

@@ -13,6 +13,7 @@ from app.core.constants import SERVICE_NAME, VERSION
 from app.core.handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.lifecycle import lifespan
+from app.middleware.registration import register_middlewares
 
 
 def create_application() -> FastAPI:
@@ -20,9 +21,9 @@ def create_application() -> FastAPI:
 
     Initializes the dependency injection container, resolves the
     application settings through it, configures structured logging,
-    registers the global exception handlers, and exposes the container and
-    the settings on the application state so every component accesses the
-    same configuration and object graph.
+    registers the global exception handlers and the middleware stack, and
+    exposes the container and the settings on the application state so
+    every component accesses the same configuration and object graph.
 
     Returns:
         A fully configured FastAPI application instance.
@@ -41,5 +42,6 @@ def create_application() -> FastAPI:
     application.state.settings = settings
 
     register_exception_handlers(application)
+    register_middlewares(application, settings)
     application.include_router(api_router)
     return application
