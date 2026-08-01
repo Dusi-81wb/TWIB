@@ -31,7 +31,10 @@ hierarchy), and the Phase 2.2 domain value objects (reusable, immutable,
 self-validating value objects for identifiers, emails, names, slugs,
 timestamps, URLs, versions, money, and metadata), and the Phase 2.3 user
 domain (the User aggregate root built from the value objects, with user
-statuses, roles, domain events, and business-rule exceptions).
+statuses, roles, domain events, and business-rule exceptions), and the
+Phase 2.4 organization domain (the Organization aggregate root with
+memberships, membership statuses, subscription plans, organization
+statuses, domain events, and business-rule exceptions).
 
 ## Structure
 
@@ -85,7 +88,7 @@ backend/
 │   │   ├── aggregate.py       # AggregateRoot
 │   │   ├── value_object.py    # ValueObject
 │   │   ├── event.py           # DomainEvent
-│   │   │   ├── exceptions.py      # Domain exception hierarchy
+│   │   ├── exceptions.py      # Domain exception hierarchy
 │   │   ├── value_objects/     # Concrete domain value objects
 │   │   │   ├── __init__.py    # Public value object exports
 │   │   │   ├── id.py          # UuidIdentity
@@ -97,13 +100,21 @@ backend/
 │   │   │   ├── version.py     # Version
 │   │   │   ├── money.py       # Money
 │   │   │   └── metadata.py    # Metadata
-│   │   └── users/             # User domain aggregate
-│   │       ├── __init__.py    # Public user domain exports
-│   │       ├── user.py        # User aggregate root
-│   │       ├── role.py        # UserRole
-│   │       ├── status.py      # UserStatus
-│   │       ├── events.py      # User domain events
-│   │       └── exceptions.py  # User business-rule exceptions
+│   │   ├── users/             # User domain aggregate
+│   │   │   ├── __init__.py    # Public user domain exports
+│   │   │   ├── user.py        # User aggregate root
+│   │   │   ├── role.py        # UserRole
+│   │   │   ├── status.py      # UserStatus
+│   │   │   ├── events.py      # User domain events
+│   │   │   └── exceptions.py  # User business-rule exceptions
+│   │   └── organizations/     # Organization domain aggregate
+│   │       ├── __init__.py     # Public organization domain exports
+│   │       ├── organization.py # Organization aggregate root
+│   │       ├── membership.py   # OrganizationMembership, MembershipStatus
+│   │       ├── plan.py         # SubscriptionPlan
+│   │       ├── status.py       # OrganizationStatus
+│   │       ├── events.py       # Organization domain events
+│   │       └── exceptions.py   # Organization business-rule exceptions
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -311,6 +322,7 @@ can be reused by every future module (Clean Architecture).
 | `exceptions.py`  | Domain exception hierarchy                        |
 | `value_objects/` | Concrete, reusable value objects (package)        |
 | `users/`         | User aggregate, roles, statuses, events, exceptions |
+| `organizations/` | Organization aggregate, memberships, plans, statuses, events, exceptions |
 
 ### Entities
 
@@ -496,6 +508,146 @@ all subclasses of `BusinessRuleViolation`:
 | `EmailAlreadyAssigned`| An email is already assigned to the user      |
 | `CannotSuspendOwner`  | An owner user is suspended                    |
 | `UserAlreadyActive`   | An already-active user is activated           |
+
+### Organization Aggregate
+
+The tenant boundary of TWIB is the `Organization` aggregate root in
+`app/domain/organizations/`, imported from a single location:
+
+```python
+from app.domain.organizations import (
+    MembershipStatus,
+    Organization,
+    OrganizationStatus,
+    SubscriptionPlan,
+)
+from app.domain.users.role import UserRole
+from app.domain.value_objects import Name, Slug, UuidIdentity
+```
+
+`Organization` extends `AggregateRoot` and is built entirely from the Phase 2.2
+value objects, the `OrganizationStatus`/`SubscriptionPlan` enums, and a
+collection of immutable `OrganizationMembership` domain objects. Its state is
+exposed only through read-only properties, and every change goes through a
+domain method that validates the operation, records a domain event, and bumps
+the version:
+
+| Property            | Type                       | Meaning                              |
+| ------------------- | -------------------------- | ------------------------------------ |
+| `organization_id`   | `UuidIdentity`             | Stable UUID identity of the org      |
+| `name`              | `Name`                     | The organization's name              |
+| `slug`              | `Slug`                     | URL-friendly slug                    |
+| `owner_id`          | `UuidIdentity`             | Identity of the organization owner   |
+| `created_at`        | `Timestamp`                | When the org was created (UTC)       |
+| `updated_at`        | `Timestamp`                | When the org was last changed (UTC)  |
+| `status`            | `OrganizationStatus`       | Current lifecycle state              |
+| `subscription_plan` | `SubscriptionPlan`         | Subscription plan the org is on      |
+| `metadata`          | `Metadata`                 | Key/value metadata map (immutable)   |
+| `version`           | `Version`                  | Optimistic-locking version (auto-bumped) |
+| `members`           | `tuple[OrganizationMembership, ...]` | Current memberships            |
+
+```python
+org = Organization(
+    organization_id=UuidIdentity.generate(),
+    name=Name("Acme Corp"),
+    slug=Slug("acme"),
+    owner_id=UuidIdentity.generate(),
+)
+org.activate()
+org.add_member(member_id, role=UserRole.ADMIN)
+for event in org.pull_domain_events():
+    pass  # publishing is done by an outer layer
+```
+
+The owner is implicitly added as an active OWNER-role member at construction.
+The domain methods are `rename()`, `change_slug()`, `change_plan()`,
+`activate()`, `suspend()`, `archive()`, `restore()`, `add_member()`,
+`remove_member()`, `change_owner()`, `update_metadata()`, and
+`increment_version()`. Every successful mutation refreshes `updated_at` and
+bumps `version` (one patch); call `increment_version()` directly only for
+out-of-band changes. `get_member(user_id)` returns a membership or `None`.
+
+An archived organization is immutable until `restore()` is called (every
+mutation raises `OrganizationArchived`), and a deleted organization cannot be
+modified at all.
+
+#### Organization Memberships
+
+`OrganizationMembership` (in `app/domain/organizations/membership.py`) is an
+immutable domain object describing a user's membership in an organization. It
+is not an aggregate; it exists inside the organization aggregate:
+
+| Field                | Type                       | Meaning                              |
+| -------------------- | -------------------------- | ------------------------------------ |
+| `user_id`            | `UuidIdentity`             | Identity of the member               |
+| `role`               | `UserRole`                 | Role the member holds                |
+| `joined_at`          | `Timestamp`                | When the membership started (UTC)    |
+| `status`             | `MembershipStatus`         | Current membership state             |
+| `invitation_accepted`| `bool`                     | Whether the invitation was accepted  |
+
+`MembershipStatus` is a `StrEnum`: `PENDING` (invitation sent, not accepted),
+`ACTIVE`, and `INACTIVE`. A pending membership cannot have an accepted
+invitation and vice versa; the constructor enforces this with `InvalidValue`.
+Memberships are compared and hashed by value and cannot be mutated after
+construction.
+
+#### Organization Statuses
+
+`OrganizationStatus` (in `app/domain/organizations/status.py`) is a `StrEnum`:
+
+| Status      | Value         | Meaning                                     |
+| ----------- | ------------- | ------------------------------------------- |
+| `PENDING`   | `"pending"`   | Created but not activated yet               |
+| `ACTIVE`    | `"active"`    | Active and usable                           |
+| `SUSPENDED` | `"suspended"` | Temporarily suspended                       |
+| `ARCHIVED`  | `"archived"`  | Archived; immutable until restored          |
+| `DELETED`   | `"deleted"`   | Deleted; terminal state                     |
+
+#### Subscription Plans
+
+`SubscriptionPlan` (in `app/domain/organizations/plan.py`) is a `StrEnum`:
+
+| Plan             | Value          |
+| ---------------- | -------------- |
+| `FREE`           | `"free"`       |
+| `STARTER`        | `"starter"`    |
+| `PROFESSIONAL`   | `"professional"` |
+| `ENTERPRISE`     | `"enterprise"` |
+| `CUSTOM`         | `"custom"`     |
+
+No plan limits, entitlements, or billing logic are modelled; this phase only
+declares the plan identifier.
+
+#### Organization Domain Events
+
+`app/domain/organizations/events.py` defines the domain events, all subclasses
+of `DomainEvent` that carry the affected `organization_id`:
+
+| Event                  | Recorded by                                 |
+| ---------------------- | ------------------------------------------- |
+| `OrganizationCreated`  | construction of a new organization          |
+| `OrganizationRenamed`  | `rename()` (carries new and previous names) |
+| `OrganizationActivated`| `activate()`                                 |
+| `OrganizationSuspended`| `suspend()`                                 |
+| `MemberAdded`          | `add_member()` (carries the member role)    |
+| `MemberRemoved`        | `remove_member()` (carries the user ID)     |
+| `OwnerChanged`         | `change_owner()` (carries new/previous)     |
+| `PlanChanged`          | `change_plan()` (carries new/previous plan) |
+
+The aggregate only records events; there is no event bus in this phase.
+
+#### Organization Business-Rule Exceptions
+
+`app/domain/organizations/exceptions.py` defines the organization
+business-rule exceptions, all subclasses of `BusinessRuleViolation`:
+
+| Exception                 | Raised when                               |
+| ------------------------- | ----------------------------------------- |
+| `InvalidOrganizationState`| An operation is invalid in the current state |
+| `OrganizationArchived`    | An archived org is modified before restore |
+| `DuplicateMember`         | A user is added as an active member twice |
+| `MembershipAlreadyExists` | A pending membership exists for the user  |
+| `OwnerCannotBeRemoved`    | The owner is removed without transfer     |
 
 ### Domain Events
 
@@ -1268,6 +1420,14 @@ deferred until those subsystems exist.
   through read-only properties; domain methods validate, record events, and
   auto-bump the optimistic-locking version. No authentication, password,
   database, repository, or API code exists in the domain layer.
+- The organization domain in `app/domain/organizations/` models the
+  `Organization` aggregate root (built from the value objects, with
+  `OrganizationStatus`/`SubscriptionPlan` enums, immutable
+  `OrganizationMembership` domain objects, organization domain events, and
+  organization business-rule exceptions). The owner is an implicit active
+  OWNER-role member; archived organizations are immutable until restored. No
+  billing, plan-limit, database, repository, or API code exists in the domain
+  layer.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

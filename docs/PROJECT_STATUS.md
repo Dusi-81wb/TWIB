@@ -29,7 +29,7 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        ███████████░░░░░░░░░  55%
+Domain Layer        ██████████████░░░░░░  70%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -49,8 +49,8 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 ```
 
 > Domain Layer: Phases 2.1 (base classes, exceptions), 2.2 (concrete
-> value objects), and 2.3 (user domain) are complete; the organization domain
-> follows in Phase 2.4.
+> value objects), 2.3 (user domain), and 2.4 (organization domain) are
+> complete; the workspace domain follows in Phase 2.5.
 
 ---
 
@@ -62,7 +62,7 @@ Sprint 2
 
 # Current Phase
 
-Phase 2.4 — Organization Domain
+Phase 2.5 — Workspace Domain
 
 ---
 
@@ -74,9 +74,9 @@ Phase 2.4 — Organization Domain
 
 # Current Objective
 
-Implement the Organization domain aggregate on top of the domain foundation,
-the Phase 2.2 value objects, and the Phase 2.3 user domain, establishing the
-pattern concrete organizations, memberships, and roles follow.
+Implement the Workspace domain aggregate on top of the domain foundation,
+the Phase 2.2 value objects, and the Phase 2.3/2.4 user and organization
+domains, establishing the pattern concrete workspaces follow.
 
 Do NOT implement
 
@@ -90,40 +90,52 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 2.3
+✅ Phase 2.4
 
 Completed
 
-- `backend/app/domain/users/` package with six files (`__init__.py`,
-  `user.py`, `role.py`, `status.py`, `events.py`, `exceptions.py`)
-- `User` aggregate root built entirely from the Phase 2.2 value objects
-  (`UuidIdentity`, `Email`, `Name`, `Timestamp`, `Metadata`, `Version`)
-- `UserStatus` `StrEnum` (pending, active, suspended, disabled, deleted)
-- `UserRole` `StrEnum` (owner, admin, member, viewer; no permissions yet)
-- User domain events (`UserCreated`, `UserActivated`, `UserSuspended`,
-  `UserDeleted`, `UserEmailChanged`, `UserNameChanged`)
-- User business-rule exceptions (`InvalidUserState`, `EmailAlreadyAssigned`,
-  `CannotSuspendOwner`, `UserAlreadyActive`)
-- Domain methods (`change_display_name`, `change_email`, `activate`,
-  `deactivate`, `suspend`, `restore`, `delete`, `update_metadata`,
-  `increment_version`) that validate, record events, refresh `updated_at`,
-  and auto-bump the optimistic-locking version
-- State is exposed only through read-only properties; no mutable attributes
-  are exposed directly
-- Pure Python with no FastAPI, Pydantic, SQLAlchemy, repositories,
-  authentication, password hashing, or JWT
-- `backend/README.md` documents the user aggregate, roles, statuses, domain
-  events, and business-rule exceptions
+- `backend/app/domain/organizations/` package with six files (`__init__.py`,
+  `organization.py`, `membership.py`, `plan.py`, `status.py`, `events.py`,
+  `exceptions.py`)
+- `Organization` aggregate root built entirely from the Phase 2.2 value
+  objects (`UuidIdentity`, `Name`, `Slug`, `Timestamp`, `Metadata`,
+  `Version`) and the `OrganizationStatus`/`SubscriptionPlan` enums
+- Immutable `OrganizationMembership` domain object (user ID, role, joined
+  time, membership status, invitation-accepted flag) plus the
+  `MembershipStatus` `StrEnum` (pending, active, inactive)
+- `OrganizationStatus` `StrEnum` (pending, active, suspended, archived,
+  deleted) and `SubscriptionPlan` `StrEnum` (free, starter, professional,
+  enterprise, custom)
+- Organization domain events (`OrganizationCreated`, `OrganizationRenamed`,
+  `OrganizationActivated`, `OrganizationSuspended`, `MemberAdded`,
+  `MemberRemoved`, `OwnerChanged`, `PlanChanged`)
+- Organization business-rule exceptions (`InvalidOrganizationState`,
+  `OrganizationArchived`, `DuplicateMember`, `MembershipAlreadyExists`,
+  `OwnerCannotBeRemoved`)
+- Domain methods (`rename`, `change_slug`, `change_plan`, `activate`,
+  `suspend`, `archive`, `restore`, `add_member`, `remove_member`,
+  `change_owner`, `update_metadata`, `increment_version`) that validate,
+  record events, refresh `updated_at`, and auto-bump the
+  optimistic-locking version
+- The owner is implicitly added as an active OWNER-role member; the owner
+  cannot be removed, and changing the owner swaps roles (new owner becomes
+  OWNER, previous owner becomes ADMIN)
+- Archived organizations are immutable until restored; deleted
+  organizations cannot be modified
+- Pure Python with no FastAPI, Pydantic, SQLAlchemy, repositories, billing,
+  plan-limit, or authentication code
+- `backend/README.md` documents the organization aggregate, memberships,
+  plans, statuses, domain events, and business-rule exceptions
 
-(Previous: ✅ Phase 2.2)
+(Previous: ✅ Phase 2.3)
 
 ---
 
 # Next Milestone
 
-Phase 2.4
+Phase 2.5
 
-Organization Domain
+Workspace Domain
 
 ---
 
@@ -260,12 +272,13 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/users/__init__.py (created)
-- backend/app/domain/users/user.py (created)
-- backend/app/domain/users/role.py (created)
-- backend/app/domain/users/status.py (created)
-- backend/app/domain/users/events.py (created)
-- backend/app/domain/users/exceptions.py (created)
+- backend/app/domain/organizations/__init__.py (created)
+- backend/app/domain/organizations/organization.py (created)
+- backend/app/domain/organizations/membership.py (created)
+- backend/app/domain/organizations/plan.py (created)
+- backend/app/domain/organizations/status.py (created)
+- backend/app/domain/organizations/events.py (created)
+- backend/app/domain/organizations/exceptions.py (created)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -434,11 +447,19 @@ _Not committed yet_
 
 ## Phase 2.4
 
-- [ ] Organization domain package (`backend/app/domain/organizations/`)
-- [ ] Organization aggregate root
-- [ ] Memberships and organization roles
-- [ ] Organization domain events and invariants
-- [ ] README documentation for the organization domain
+- [x] Organization domain package (`backend/app/domain/organizations/`)
+- [x] Organization aggregate root
+- [x] Memberships and organization roles
+- [x] Organization domain events and invariants
+- [x] README documentation for the organization domain
+
+## Phase 2.5
+
+- [ ] Workspace domain package (`backend/app/domain/workspaces/`)
+- [ ] Workspace aggregate root
+- [ ] Workspace membership and roles
+- [ ] Workspace domain events and invariants
+- [ ] README documentation for the workspace domain
 
 ---
 
@@ -589,11 +610,19 @@ Completed
 - Phase 2.3 User Domain (User aggregate root, user statuses, roles, domain
   events, business-rule exceptions)
 
+Session 18
+
+Completed
+
+- Phase 2.4 Organization Domain (Organization aggregate root, immutable
+  memberships, subscription plans, organization statuses, domain events,
+  business-rule exceptions)
+
 Next Session
 
-Phase 2.4
+Phase 2.5
 
-Organization Domain
+Workspace Domain
 
 ---
 
@@ -885,6 +914,130 @@ None
 - The `User` constructor accepts optional `created_at`, `updated_at`,
   `status`, `role`, `metadata`, and `version` so outer layers can reconstruct
   aggregates from storage; there is no persistence code yet.
+- `folder_structure.md` still lists `app/models/` as the future home of
+  domain models; the implemented home is `app/domain/`. The docs can be
+  aligned when the roadmap is next updated.
+
+---
+
+# Phase 2.4 Summary
+
+## Files Created
+
+- backend/app/domain/organizations/__init__.py
+- backend/app/domain/organizations/organization.py
+- backend/app/domain/organizations/membership.py
+- backend/app/domain/organizations/plan.py
+- backend/app/domain/organizations/status.py
+- backend/app/domain/organizations/events.py
+- backend/app/domain/organizations/exceptions.py
+
+## Files Modified
+
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `Organization` extends `AggregateRoot[uuid.UUID]` and is built entirely
+  from the Phase 2.2 value objects (`UuidIdentity`, `Name`, `Slug`,
+  `Timestamp`, `Metadata`, `Version`) plus the `OrganizationStatus` and
+  `SubscriptionPlan` enums; state is exposed only through read-only
+  properties.
+- Construction implicitly adds the owner as an active OWNER-role member and
+  records an `OrganizationCreated` event; `pull_domain_events()` returns
+  events in order and clears the record.
+- `rename()`, `change_slug()`, `change_plan()`, and `update_metadata()` are
+  no-ops when the new value equals the current one.
+- `activate()` raises `InvalidOrganizationState` when already active;
+  `suspend()` behaves likewise; `archive()` raises `OrganizationArchived`
+  when already archived; `restore()` raises `InvalidOrganizationState` when
+  not archived.
+- An archived organization is immutable: every later mutation raises
+  `OrganizationArchived` until `restore()`.
+- `add_member()` raises `DuplicateMember` for an existing active member and
+  `MembershipAlreadyExists` for an existing pending membership.
+- `remove_member()` raises `OwnerCannotBeRemoved` for the owner and
+  `InvalidOrganizationState` for a non-member.
+- `change_owner()` only accepts an existing member (else
+  `InvalidOrganizationState`), records `OwnerChanged` with new and previous
+  owner IDs, and swaps roles (new owner becomes OWNER, previous owner
+  becomes ADMIN).
+- `OrganizationMembership` is immutable (raises `TypeError` on assignment)
+  and its constructor rejects an accepted invitation in the PENDING state
+  and a non-pending membership without an accepted invitation
+  (`InvalidValue`); memberships compare and hash by value.
+- Every successful mutation refreshes `updated_at` and bumps `version` by
+  one patch; `increment_version()` exposes an explicit bump.
+- `OrganizationStatus` and `SubscriptionPlan` are `StrEnum`s with the
+  documented members; `MembershipStatus` covers pending, active, and
+  inactive.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain`.
+- A runtime smoke test (creation, owner auto-membership, every domain
+  method, each event, every exception path, and version bumping) succeeds.
+- No authentication, billing, plan-limit, database model, repository, API
+  route, or external dependency was added.
+
+## Architectural Decisions
+
+- `Organization` subclasses `AggregateRoot[uuid.UUID]` and bridges to the
+  base's identity contract with the generic `Identity(organization_id.value)`;
+  the canonical identifier exposed to callers is the `UuidIdentity` value
+  object via the `organization_id` property (same pattern as `User`).
+- The aggregate's state lives in private fields and is exposed only through
+  read-only properties; mutability happens exclusively through domain
+  methods that enforce business rules, so no mutable attribute is exposed
+  directly.
+- The owner is an implicit, always-present active OWNER-role member. The
+  owner cannot be removed (`OwnerCannotBeRemoved`); ownership transfers via
+  `change_owner()` which swaps roles so the organization always retains
+  exactly one owner.
+- Memberships are immutable domain objects stored privately in a
+  `dict[UuidIdentity, OrganizationMembership]` and exposed as a tuple;
+  `get_member()` provides lookup. Membership is a domain object only, not
+  an aggregate.
+- Optimistic locking mirrors the user aggregate: every successful domain
+  method calls `_touch()` (refresh `updated_at`, bump the version), and
+  `increment_version()` is provided for explicit out-of-band bumps.
+- `OrganizationStatus` and `SubscriptionPlan` are `StrEnum`s (per the
+  Phase 1.8 UP042 convention) rather than value-object wrappers; plan
+  limits and billing are intentionally out of scope.
+- Organization domain exceptions subclass `BusinessRuleViolation`, matching
+  their semantics as enterprise business-rule violations.
+- Organization events subclass `DomainEvent` and carry the affected
+  `organization_id` plus new and previous values for the change events
+  (`OrganizationRenamed`, `OwnerChanged`, `PlanChanged`), so consumers have
+  everything they need without querying state.
+
+## Suggestions (Not Implemented)
+
+- No unit tests were added in this phase (running the pytest tooling is out
+  of scope per the phase rules). A future phase should add
+  `backend/tests/domain/` unit tests covering the value objects, the user
+  aggregate, and the organization aggregate.
+- `archive()`, `restore()`, `change_slug()`, `change_owner()` (via
+  `change_owner`), and membership role changes do not emit domain events
+  (the phase specified exactly eight events). A future phase can add
+  `OrganizationArchived`, `OrganizationRestored`, `SlugChanged`, and
+  `MemberRoleChanged` events for full auditability.
+- `add_member()` only creates ACTIVE members. Invitation flows (creating
+  PENDING memberships and later accepting them) require an application
+  service and will land with the database phase; the `MembershipStatus`
+  enum and constructor validation already support pending memberships.
+- Membership removal is immediate (`remove_member()` deletes the
+  membership). A soft-delete or `INACTIVE`-transition flow can be added
+  once persistence exists.
+- `change_plan()` only records the plan change; no plan limits,
+  entitlements, or downgrade checks are modelled. Billing logic belongs to
+  a future billing phase.
+- The `Organization` constructor accepts optional `created_at`, `updated_at`,
+  `status`, `subscription_plan`, `metadata`, and `version` so outer layers
+  can reconstruct aggregates from storage; there is no persistence code yet.
 - `folder_structure.md` still lists `app/models/` as the future home of
   domain models; the implemented home is `app/domain/`. The docs can be
   aligned when the roadmap is next updated.
