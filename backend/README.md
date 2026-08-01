@@ -16,7 +16,11 @@ IDs, security headers, and settings-driven CORS), and the Phase 1.7 API
 foundation (reusable response and pagination schemas, centralized API
 tags, response helper functions, and a configured OpenAPI document), and
 the Phase 1.8 code quality infrastructure (Ruff linting and formatting,
-MyPy strict type checking, and pre-commit hooks).
+MyPy strict type checking, and pre-commit hooks), and the Phase 1.9
+testing infrastructure (pytest, pytest-asyncio, coverage, and a reusable
+httpx-based test client), and the Phase 1.10 Docker development
+environment (a development image using uv, and a Docker Compose stack for
+the backend with PostgreSQL, Redis, and Qdrant).
 
 ## Structure
 
@@ -59,6 +63,11 @@ backend/
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
+├── pytest.ini             # Pytest configuration (discovery, coverage, async)
+├── tests/
+│   ├── __init__.py        # Marks the directory as a package
+│   ├── conftest.py        # Shared fixtures (reusable TestClient)
+│   └── test_health.py     # Health endpoint tests
 ├── uv.lock                # Locked dependency versions
 ├── .python-version        # Python 3.12
 └── README.md
@@ -493,6 +502,91 @@ Interactive API documentation is available at:
 - Swagger UI: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
 
+## Docker Development
+
+A development-oriented Docker setup is included so the backend and its
+supporting services (PostgreSQL, Redis, Qdrant) run locally in containers.
+
+### Files
+
+- `Dockerfile` (repository root) - a Python 3.12 development image using
+  uv. It installs runtime and development dependencies, runs uvicorn with
+  hot reload (`--reload`) as a non-root user, and exposes port `8000`.
+- `docker/development/docker-compose.yml` - the development stack:
+  `backend`, `postgres`, `redis`, and `qdrant` on a single bridge network
+  with named volumes for persistent data.
+- `.dockerignore` (repository root) - keeps the build context small by
+  sending only the backend subtree to the Docker daemon.
+
+### Prerequisites
+
+- Docker 24+
+- Docker Compose 2+
+
+The backend reads its configuration from `backend/.env` through the
+existing settings system. Create it first from the template:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+### Starting Containers
+
+```bash
+cd docker/development
+docker compose up
+```
+
+This builds the backend image, starts all four services, and runs the
+backend with hot reload. The API is available at
+<http://localhost:8000/api/v1/health>.
+
+To start the stack in the background:
+
+```bash
+docker compose up -d
+```
+
+### Stopping Containers
+
+```bash
+docker compose down
+```
+
+Named volumes keep PostgreSQL, Redis, and Qdrant data across restarts. To
+stop the stack and remove the data volumes too:
+
+```bash
+docker compose down -v
+```
+
+### Useful Commands
+
+| Command                                         | Purpose                                    |
+| ----------------------------------------------- | ------------------------------------------ |
+| `docker compose build`                          | Rebuild the backend image                  |
+| `docker compose up -d`                          | Start the stack in the background          |
+| `docker compose logs -f backend`                | Follow backend logs                        |
+| `docker compose exec backend uv run pytest`     | Run the test suite in the container        |
+| `docker compose exec backend sh`                | Open a shell in the backend container      |
+| `docker compose down`                           | Stop the stack (keeps volumes)             |
+| `docker compose down -v`                        | Stop the stack and delete the volumes      |
+
+Changes under `backend/app` are reflected immediately through the mounted
+source and uvicorn's reloader. Adding or changing dependencies requires a
+rebuild:
+
+```bash
+docker compose build backend
+```
+
+Supporting services expose their default ports on the host: PostgreSQL
+`5432`, Redis `6379`, and Qdrant REST `6333` / gRPC `6334`. Inside the
+Docker network the backend reaches them by service name (for example
+`postgres:5432`), so connection strings in `backend/.env` must use the
+service names once the database layer is implemented.
+
 ## Code Quality
 
 The backend is guarded by a code quality toolchain that runs locally and
@@ -578,6 +672,72 @@ uv run pre-commit run --all-files
 5. Stage the files and commit. Pre-commit re-runs Ruff lint, Ruff format,
    and MyPy on the staged backend files and blocks the commit until all
    three pass.
+
+## Testing
+
+The backend is tested with [pytest](https://docs.pytest.org/). The suite
+lives in `backend/tests/` and currently covers the HTTP layer through a
+reusable FastAPI `TestClient` backed by
+[httpx](https://www.python-httpx.org/).
+
+Test dependencies (`pytest`, `pytest-asyncio`, `pytest-cov`, `httpx`) are
+part of the `dev` dependency group and are installed by `uv sync`. Pytest
+is configured centrally in `backend/pytest.ini` (discovery, coverage, and
+async support).
+
+### Test Structure
+
+```text
+backend/tests/
+├── __init__.py      # Marks the directory as a package
+├── conftest.py      # Shared fixtures (reusable TestClient)
+└── test_health.py   # Health endpoint tests
+```
+
+- `conftest.py` defines the `client` fixture. It builds the application
+  through `create_application()` and enters the `TestClient` as a context
+  manager so the FastAPI lifespan runs for every test. New test modules
+  request the `client` fixture instead of constructing their own client,
+  which avoids duplicate setup.
+- `test_health.py` verifies `GET /api/v1/health`: the HTTP status code, the
+  body against the shared `HealthResponse` schema, the JSON content type,
+  and that the application starts and stops cleanly through the lifespan.
+
+### Running Tests
+
+```bash
+cd backend
+uv run pytest
+```
+
+Pytest discovers tests in the `backend/tests/` package (`testpaths` in
+`pytest.ini`) and runs them in strict asyncio mode (`asyncio_mode =
+strict`), so future async tests opt in with `@pytest.mark.asyncio`.
+
+### Coverage
+
+Coverage is collected by pytest-cov on every run. The `app` package is the
+coverage source and the terminal summary is printed by default:
+
+```bash
+cd backend
+uv run pytest
+```
+
+This is the default invocation; `pytest.ini` adds
+`--cov=app --cov-report=term-missing` to `addopts`. To inspect coverage in
+more detail:
+
+```bash
+cd backend
+uv run pytest --cov-report=html
+```
+
+An HTML report is written to `backend/htmlcov/` (git-ignored).
+
+Only the HTTP infrastructure is tested in this phase. Authentication,
+database, repository, service, agent, LLM, and workflow-engine tests are
+deferred until those subsystems exist.
 
 ## Development Notes
 

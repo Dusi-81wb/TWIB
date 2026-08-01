@@ -1,0 +1,19 @@
+# Docker build context for the backend development image.
+#
+# The backend image only needs the backend subtree, so everything else is
+# excluded from the build context to keep it small and fast.
+
+*
+!backend/
+!backend/**
+
+# Backend internals excluded from the build context.
+backend/.venv/
+backend/.env
+backend/.env.*
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/htmlcov/

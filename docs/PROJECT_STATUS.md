@@ -27,7 +27,7 @@ Architecture        ████████████████████
 
 Documentation       ████████████████████ 100%
 
-Foundation          ███████████████████░  90%
+Foundation          ████████████████████ 100%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -56,7 +56,7 @@ Sprint 1
 
 # Current Phase
 
-Phase 1.9 — Testing Infrastructure
+Phase 1.11 — Docker Production
 
 ---
 
@@ -68,8 +68,8 @@ Phase 1.9 — Testing Infrastructure
 
 # Current Objective
 
-Establish the testing infrastructure phase for the FastAPI backend
-(unit and integration test tooling).
+Establish the Docker production foundation for the TWIB backend
+(multi-stage production image and a production Docker Compose stack).
 
 Do NOT implement
 
@@ -83,37 +83,40 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 1.8
+✅ Phase 1.10
 
 Completed
 
-- Ruff configured in `backend/pyproject.toml` (`[tool.ruff]`): lint,
-  format, and import sorting for Python 3.12; `app` registered as a
-  first-party package
-- MyPy configured in `backend/pyproject.toml` (`[tool.mypy]`): strict
-  mode targeting Python 3.12; no `ignore_missing_imports` overrides
-  required (FastAPI, Pydantic, structlog, and dependency-injector all
-  ship type annotations)
-- Dev dependency group added: `ruff`, `mypy`, `pre-commit`, and
-  `types-requests` (`[dependency-groups] dev`)
-- `.pre-commit-config.yaml` created at the repository root with hooks for
-  Ruff lint, Ruff format, and MyPy strict on staged backend files
-- `ruff check` and `ruff format --check` pass across `backend/app`
-- `mypy` (strict) passes across `backend/app`
-- Minimal type-annotation-only source updates required by the new tooling
-  (see Phase 1.8 Summary); no business, API, or middleware behavior changed
-- `backend/README.md` documents linting, formatting, type checking,
-  pre-commit, and the developer workflow
+- `Dockerfile` (repository root): Python 3.12 development image using uv,
+  installs runtime and development dependencies, runs uvicorn with hot
+  reload (`--reload`) as a non-root user (uid 1000), and exposes port 8000
+- `.dockerignore` (repository root): whitelist build context that sends
+  only the `backend/` subtree to the Docker daemon (excludes `.venv`,
+  caches, and environment files)
+- `docker/development/docker-compose.yml`: development stack with
+  `backend`, `postgres`, `redis`, and `qdrant` services on a single
+  `twib-dev` bridge network
+- Named volumes (`postgres_data`, `redis_data`, `qdrant_data`) persist
+  supporting-service data across restarts
+- Backend service reads configuration from `backend/.env` through the
+  existing settings system; no secrets are hardcoded anywhere
+- Backend source is bind-mounted (`backend/app`) so uvicorn's reloader
+  picks up changes; healthchecks and `depends_on: service_healthy` gate
+  backend startup on the supporting services
+- No production Dockerfile, production compose, Kubernetes, NGINX, CI/CD,
+  Terraform, or Helm was created
+- `backend/README.md` documents Docker development, starting and stopping
+  containers, and useful commands
 
-(Previous: ✅ Phase 1.7 — API Foundation)
+(Previous: ✅ Phase 1.9 — Testing Infrastructure)
 
 ---
 
 # Next Milestone
 
-Phase 1.9
+Phase 1.11
 
-Testing Infrastructure
+Docker Production
 
 ---
 
@@ -250,21 +253,10 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/pyproject.toml
-- backend/app/schemas/common.py
-- backend/app/schemas/pagination.py
-- backend/app/schemas/response.py
-- backend/app/schemas/__init__.py
-- backend/app/api/openapi.py
-- backend/app/core/environments.py
-- backend/app/core/exceptions.py
-- backend/app/core/handlers.py
-- backend/app/core/logging.py
-- backend/app/dependencies.py
-- backend/app/middleware/request_id.py
-- backend/app/middleware/security_headers.py
+- Dockerfile
+- .dockerignore
+- docker/development/docker-compose.yml
 - backend/README.md
-- .pre-commit-config.yaml
 - docs/PROJECT_STATUS.md
 
 # Pending Tasks
@@ -346,11 +338,30 @@ _Not committed yet_
 
 ## Phase 1.9
 
-- [ ] Add pytest and pytest-asyncio dev dependencies
-- [ ] Configure pytest in `pyproject.toml`
-- [ ] HTTP-based test client (httpx) for the FastAPI application
-- [ ] Unit tests for existing modules
-- [ ] README documentation for testing
+- [x] Add `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` dev dependencies
+- [x] Configure test discovery, coverage, and async support in `pytest.ini`
+- [x] Create `backend/tests/` package (`__init__.py`, `conftest.py`, `test_health.py`)
+- [x] Reusable TestClient fixture (`client` in `conftest.py`)
+- [x] Health endpoint tests (status code, response model, application starts, content type)
+- [x] README documentation for testing
+
+## Phase 1.10
+
+- [x] Development Dockerfile (Python 3.12, uv, non-root user, port 8000, hot reload)
+- [x] Root `.dockerignore` (backend-only build context)
+- [x] `docker/development/docker-compose.yml`
+- [x] Backend service (reads `.env`, source bind mount, health check)
+- [x] Supporting services (postgres, redis, qdrant) with named volumes
+- [x] Single development bridge network
+- [x] README documentation for Docker
+
+## Phase 1.11
+
+- [ ] Multi-stage production Dockerfile
+- [ ] Production Docker Compose
+- [ ] Docker image optimization
+- [ ] Production health checks
+- [ ] README documentation for production Docker
 
 ---
 
@@ -450,11 +461,173 @@ Completed
 
 - Phase 1.8 Code Quality
 
+Session 10
+
+Completed
+
+- Phase 1.9 Testing Infrastructure
+
+Session 11
+
+Completed
+
+- Phase 1.10 Docker Development Environment
+
 Next Session
 
-Phase 1.9
+Phase 1.11
 
-Testing Infrastructure
+Docker Production
+
+---
+
+# Phase 1.10 Summary
+
+## Files Created
+
+- Dockerfile
+- .dockerignore
+- docker/development/docker-compose.yml
+
+## Files Modified
+
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Verification Results
+
+- `Dockerfile` (repository root) targets Python 3.12, installs uv from the
+  official uv image, creates `/app` as the working directory, runs uvicorn
+  with `--reload` (hot reload) on `0.0.0.0:8000`, and executes as a
+  non-root user (`twib`, uid 1000). The image is intentionally not
+  optimized; production optimization is Phase 1.11.
+- `.dockerignore` (repository root) whitelists the build context to the
+  `backend/` subtree (`*`, `!backend/`, `!backend/**`) and re-excludes
+  `backend/.venv/`, environment files, and caches, keeping the context
+  small.
+- `docker/development/docker-compose.yml` defines `backend`, `postgres`
+  (17-alpine), `redis` (7-alpine), and `qdrant` (v1.14.0) on a single
+  `twib-dev` bridge network with named volumes (`postgres_data`,
+  `redis_data`, `qdrant_data`).
+- The backend service reads `backend/.env` via `env_file` (the existing
+  settings system) with container overrides for `HOST`/`PORT`, binds the
+  `backend/app` source for hot reload, exposes `8000:8000`, and gates
+  startup on healthy supporting services via `depends_on: service_healthy`.
+- The compose file parses as valid YAML and uses standard Compose 2+
+  constructs (`name`, `condition: service_healthy`, interpolation
+  defaults).
+- No secrets are hardcoded; supporting-service credentials default to dev
+  values via interpolation and can be overridden from the environment.
+- No production Dockerfile, production compose, Kubernetes, NGINX, CI/CD,
+  Terraform, or Helm was created.
+- No application source files were modified in this phase.
+
+---
+
+# Phase 1.10 Suggestions (Not Implemented)
+
+- Docker could not be executed during this phase (per the phase rules), so
+  the image build and `docker compose up` were not verified at runtime.
+  Run `docker compose -f docker/development/docker-compose.yml config` and
+  `docker compose up` after this phase to confirm the stack starts.
+- The uv image is pinned to `ghcr.io/astral-sh/uv:latest` in the
+  development Dockerfile. Pin a specific uv release for reproducible builds
+  once the image is stabilized.
+- `uv sync --all-groups` at build time re-locks when the manifest is newer
+  than the copied `uv.lock` (the lockfile is currently stale after Phase
+  1.9). Once `uv sync` is run manually, the Dockerfile could switch to
+  `uv sync --all-groups --frozen` for deterministic installs.
+- The backend runs with uvicorn's built-in stat reloader. Installing
+  `uvicorn[standard]` (or adding `watchfiles`) would make `--reload` use
+  the faster file watcher.
+- Bind-mounted source is owned by the host user. On Linux hosts whose user
+  is not uid 1000, the container user `twib` may lack write access to the
+  mounted files (reads still work); a UID/GID build arg could resolve this.
+- Supporting-service image tags (postgres 17, redis 7, qdrant v1.14.0)
+  should be reviewed when the database and cache phases land and the
+  services are actually used.
+- The Qdrant health check probes the REST port with a bash TCP connect;
+  if the image ever drops bash, an equivalent probe (for example against
+  `/readyz`) would be needed.
+- `docker/development/` hosts the compose file; a `docker/development/.env`
+  could be added to centralize the supporting-service credential defaults
+  documented in the README.
+
+---
+
+# Phase 1.9 Summary
+
+## Files Created
+
+- backend/tests/__init__.py
+- backend/tests/conftest.py
+- backend/tests/test_health.py
+- backend/pytest.ini
+
+## Files Modified
+
+- backend/pyproject.toml
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+- pytest (dev group, `[dependency-groups] dev`)
+- pytest-asyncio (dev group)
+- pytest-cov (dev group)
+- httpx (dev group)
+- Lockfile (`uv.lock`) update deferred to manual verification via `uv sync`
+
+## Verification Results
+
+- `backend/pytest.ini` centralizes pytest configuration: `testpaths = tests`
+  (discovery), `--cov=app --cov-report=term-missing` (coverage), and
+  `asyncio_mode = strict` (async support for future `@pytest.mark.asyncio`
+  tests).
+- `backend/tests/` is a package (`__init__.py`), so pytest resolves the
+  `app` package from the `backend/` root without path configuration.
+- The reusable `client` fixture in `conftest.py` builds the application via
+  `create_application()` and runs the FastAPI lifespan through the
+  `TestClient` context manager; no test constructs its own client.
+- `test_health.py` verifies `GET /api/v1/health` in four ways: HTTP status
+  200, body validation against the shared `HealthResponse` schema, the JSON
+  content type, and clean application startup/shutdown with the factory
+  wiring on `app.state.settings` / `app.state.container`.
+- `ruff check` and `ruff format --check` pass across `backend/app` and
+  `backend/tests`.
+- `mypy --strict` still passes across `backend/app`; no application source
+  files were modified in this phase.
+- Test files compile cleanly, and a runtime smoke test exercising the same
+  code path as the tests (application factory, `TestClient`, health
+  request) succeeds.
+- No authentication, database, repository, service, agent, LLM, or
+  workflow-engine tests were added; only infrastructure is covered.
+
+---
+
+# Phase 1.9 Suggestions (Not Implemented)
+
+- `pytest`, `pytest-asyncio`, `pytest-cov`, and `httpx` were added to
+  `pyproject.toml` but `uv.lock` was not updated (per the phase rules that
+  forbid running `uv`). Run `uv sync` after this phase to pin the new dev
+  dependencies, then `uv run pytest` to confirm the suite executes.
+- Pytest configuration lives in `backend/pytest.ini`. For consistency with
+  the single-config precedent of Phase 1.8, it could be moved into
+  `[tool.pytest.ini_options]` in `pyproject.toml` in a future phase.
+- The `client` fixture is function-scoped, so every test builds a fresh
+  application. A module- or session-scoped fixture would reduce overhead
+  once the suite grows, but function scope keeps tests isolated today.
+- The pre-commit hooks still target only `backend/app`. Extending the Ruff
+  hooks (and the MyPy hook) to `backend/tests/` would keep the test suite
+  lint-clean in CI.
+- Coverage has no failure threshold yet (`--cov-fail-under`). A threshold
+  can be added once the suite covers more than the health endpoint.
+- Only synchronous tests exist. pytest-asyncio is installed and configured
+  in strict mode so later phases can add async tests with
+  `@pytest.mark.asyncio`.
+- `types-requests` remains installed preemptively; httpx ships its own type
+  annotations, so once `requests` is actually used `types-requests` may be
+  removed from the dev group.
 
 ---
 
@@ -845,6 +1018,10 @@ feat(phase-1.6): add middleware infrastructure
 feat(phase-1.7): add API foundation
 
 feat(phase-1.8): add code quality infrastructure
+
+feat(phase-1.9): add testing infrastructure
+
+feat(phase-1.10): add docker development environment
 ```
 
 ---
@@ -853,12 +1030,12 @@ feat(phase-1.8): add code quality infrastructure
 
 Current phase is complete when:
 
-- `ruff check` passes.
-- `ruff format --check` passes.
-- `mypy` (strict) passes.
-- Pre-commit configuration exists.
-- Code quality configuration is centralized in `pyproject.toml`.
-- No authentication, database, or business logic has been implemented.
+- A development Dockerfile exists.
+- A `docker-compose.yml` exists.
+- The backend service is configured.
+- Supporting services are configured.
+- The project structure remains clean.
+- No production deployment, Kubernetes, or CI/CD has been implemented.
 
 ---
 
