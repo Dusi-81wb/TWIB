@@ -6,6 +6,8 @@ keeps the object graph owned by a single place and makes overrides in tests
 straightforward.
 """
 
+from typing import cast
+
 from fastapi import Request
 from structlog import BoundLogger
 
@@ -22,7 +24,7 @@ def get_container(request: Request) -> ApplicationContainer:
     Returns:
         The application's ``ApplicationContainer`` instance.
     """
-    return request.app.state.container
+    return cast(ApplicationContainer, request.app.state.container)
 
 
 def get_settings(request: Request) -> ApplicationSettings:

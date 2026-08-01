@@ -7,7 +7,7 @@ creation and update timestamps to any schema that inherits from it.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TypeAlias
 
 from pydantic import BaseModel, Field
@@ -37,10 +37,10 @@ class TimestampedModel(BaseModel):
     """
 
     created_at: CreatedAt = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp of record creation.",
     )
     updated_at: UpdatedAt = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp of the last update.",
     )

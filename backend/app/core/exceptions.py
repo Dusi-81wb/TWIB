@@ -10,6 +10,8 @@ exceptions (authentication, database, agents, workflows) belong in later
 phases.
 """
 
+from typing import Any
+
 from fastapi import status
 
 from app.core.error_codes import (
@@ -40,7 +42,7 @@ class TWIBException(Exception):
         self,
         message: str,
         *,
-        details: dict | None = None,
+        details: dict[str, Any] | None = None,
         error_code: str | None = None,
         status_code: int | None = None,
     ) -> None:

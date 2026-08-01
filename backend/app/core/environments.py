@@ -3,10 +3,10 @@
 The environment is selected through the ``APP_ENV`` environment variable.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Supported application environments.
 
     The string value is what must be set in ``APP_ENV``.

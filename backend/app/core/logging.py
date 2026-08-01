@@ -14,7 +14,7 @@ settings.
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -101,4 +101,7 @@ def get_logger(name: str) -> structlog.BoundLogger:
     Returns:
         A bound structlog logger for the given name.
     """
-    return structlog.get_logger(name).bind(logger=name)
+    return cast(
+        structlog.BoundLogger,
+        structlog.get_logger(name).bind(logger=name),
+    )

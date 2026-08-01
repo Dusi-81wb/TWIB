@@ -6,10 +6,13 @@ never exposed to clients; unexpected failures are logged server-side with
 full context.
 """
 
+from typing import Any, cast
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
+from starlette.types import ExceptionHandler
 
 from app.core.error_codes import (
     HTTP_ERROR,
@@ -26,8 +29,8 @@ logger = get_logger(__name__)
 def _error_payload(
     code: str,
     message: str,
-    details: dict | list | None = None,
-) -> dict:
+    details: dict[str, Any] | list[Any] | None = None,
+) -> dict[str, Any]:
     """Build the consistent error response body.
 
     Args:
@@ -147,10 +150,16 @@ def register_exception_handlers(application: FastAPI) -> None:
     Args:
         application: The FastAPI application to configure.
     """
-    application.add_exception_handler(TWIBException, twib_exception_handler)
+    application.add_exception_handler(
+        TWIBException,
+        cast(ExceptionHandler, twib_exception_handler),
+    )
     application.add_exception_handler(
         RequestValidationError,
-        request_validation_handler,
+        cast(ExceptionHandler, request_validation_handler),
     )
-    application.add_exception_handler(HTTPException, http_exception_handler)
+    application.add_exception_handler(
+        HTTPException,
+        cast(ExceptionHandler, http_exception_handler),
+    )
     application.add_exception_handler(Exception, unhandled_exception_handler)

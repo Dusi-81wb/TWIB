@@ -46,7 +46,10 @@ OPENAPI_TAGS = [
     {"name": AUTHENTICATION, "description": "Identity, login, and session management."},
     {"name": USERS, "description": "User account management."},
     {"name": ORGANIZATIONS, "description": "Organization and workspace management."},
-    {"name": WORKFLOWS, "description": "Workflow generation, execution, and monitoring."},
+    {
+        "name": WORKFLOWS,
+        "description": "Workflow generation, execution, and monitoring.",
+    },
     {"name": AGENTS, "description": "AI agent configuration and coordination."},
     {"name": BILLING, "description": "Subscriptions, plans, and invoices."},
     {"name": ADMIN, "description": "Platform administration and operations."},

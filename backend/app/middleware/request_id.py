@@ -11,6 +11,7 @@ import structlog
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -22,7 +23,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         header_name: Name of the header used to carry the request ID.
     """
 
-    def __init__(self, app, header_name: str = REQUEST_ID_HEADER) -> None:
+    def __init__(self, app: ASGIApp, header_name: str = REQUEST_ID_HEADER) -> None:
         """Initialize the middleware.
 
         Args:

@@ -14,7 +14,9 @@ dependencies), the Phase 1.5 global exception handling system
 unhandled errors), the Phase 1.6 middleware infrastructure (request
 IDs, security headers, and settings-driven CORS), and the Phase 1.7 API
 foundation (reusable response and pagination schemas, centralized API
-tags, response helper functions, and a configured OpenAPI document).
+tags, response helper functions, and a configured OpenAPI document), and
+the Phase 1.8 code quality infrastructure (Ruff linting and formatting,
+MyPy strict type checking, and pre-commit hooks).
 
 ## Structure
 
@@ -490,6 +492,92 @@ Interactive API documentation is available at:
 
 - Swagger UI: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
+
+## Code Quality
+
+The backend is guarded by a code quality toolchain that runs locally and
+through Git pre-commit hooks. Every tool is configured centrally in
+`pyproject.toml`; there is no separate `.ruff.toml`, `.mypy.ini`, or Black
+configuration. The formatter is Ruff; Black is intentionally not used.
+
+Available commands (run from the `backend/` directory):
+
+| Command                   | Purpose                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `uv run ruff check .`     | Lint the codebase                                        |
+| `uv run ruff format .`    | Apply the Ruff formatter                                  |
+| `uv run ruff format --check .` | Verify formatting without modifying files           |
+| `uv run mypy app`         | Run strict type checking                                  |
+
+### Linting
+
+Ruff lints the whole package. The enabled rule set covers:
+
+- `E`/`W` - pycodestyle errors and warnings.
+- `F` - Pyflakes (unused imports, undefined names).
+- `I` - isort import sorting.
+- `UP` - pyupgrade modernizations for Python 3.12.
+- `B` - flake8-bugbear.
+- `SIM` - flake8-simplify.
+- `C4` - flake8-comprehensions.
+- `RUF` - Ruff-specific rules.
+- `ASYNC` - flake8-async (async exception handlers that legitimately await
+  nothing are exempted).
+- `S` - bandit security rules.
+- `A` - flake8-builtins (builtin shadowing).
+
+The exact selection and the two exemptions (`ASYNC220`, `UP040`) are defined
+in `[tool.ruff.lint]` in `pyproject.toml`.
+
+### Formatting
+
+Ruff is the only formatter. It targets Python 3.12 with a line length of 88
+and double quotes. Run `uv run ruff format .` to apply it and
+`uv run ruff format --check .` to verify without modifying files.
+
+### Import Sorting
+
+Import sorting is handled by Ruff's `I` rule set. `app` is registered as a
+first-party package (`known-first-party`), so application imports always
+sort after standard-library and third-party imports.
+
+### Type Checking
+
+MyPy runs in strict mode (`[tool.mypy]` in `pyproject.toml`) targeting
+Python 3.12. Strict mode enables the full family of checks, including
+`disallow_untyped_defs`, `disallow_any_generics`, `warn_return_any`, and
+`warn_unused_ignores`. FastAPI, Pydantic, structlog, and dependency-injector
+all ship type annotations, so no `ignore_missing_imports` overrides are
+needed.
+
+### Pre-commit
+
+Git hooks are defined in `.pre-commit-config.yaml` at the repository root.
+The hooks run Ruff lint, Ruff format, and MyPy strict on staged backend
+files.
+
+```bash
+cd backend
+uv sync
+uv run pre-commit install
+```
+
+From then on every commit runs the hooks. To run them manually:
+
+```bash
+uv run pre-commit run --all-files
+```
+
+### Developer Workflow
+
+1. Make your changes in `backend/app/`.
+2. Run `uv run ruff format .` to format.
+3. Run `uv run ruff check .` to lint; auto-fixable issues are fixed by the
+   pre-commit hook.
+4. Run `uv run mypy app` to type check.
+5. Stage the files and commit. Pre-commit re-runs Ruff lint, Ruff format,
+   and MyPy on the staged backend files and blocks the commit until all
+   three pass.
 
 ## Development Notes
 

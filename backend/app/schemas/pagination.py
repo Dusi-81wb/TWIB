@@ -6,11 +6,7 @@ and services in later phases. The models are generic so they can wrap any
 item type.
 """
 
-from typing import Generic, TypeVar
-
 from pydantic import BaseModel, Field
-
-T = TypeVar("T")
 
 
 class PaginationMeta(BaseModel):
@@ -27,13 +23,15 @@ class PaginationMeta(BaseModel):
 
     page: int = Field(ge=1, description="One-based index of the current page.")
     page_size: int = Field(ge=1, description="Number of items per page.")
-    total_items: int = Field(ge=0, description="Total number of items across all pages.")
+    total_items: int = Field(
+        ge=0, description="Total number of items across all pages."
+    )
     total_pages: int = Field(ge=0, description="Total number of pages available.")
     has_previous: bool = Field(description="Whether a previous page exists.")
     has_next: bool = Field(description="Whether a next page exists.")
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """Response envelope for a single page of results.
 
     Attributes:

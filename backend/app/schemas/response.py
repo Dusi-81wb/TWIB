@@ -6,14 +6,12 @@ envelopes match the JSON contract already produced by the global exception
 handlers in :mod:`app.core.handlers`.
 """
 
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel
 
-T = TypeVar("T")
 
-
-class SuccessResponse(BaseModel, Generic[T]):
+class SuccessResponse[T](BaseModel):
     """Successful response envelope.
 
     Attributes:

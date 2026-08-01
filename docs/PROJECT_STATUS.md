@@ -27,7 +27,7 @@ Architecture        ████████████████████
 
 Documentation       ████████████████████ 100%
 
-Foundation          ██████████████████░  88%
+Foundation          ███████████████████░  90%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -56,7 +56,7 @@ Sprint 1
 
 # Current Phase
 
-Phase 1.8 — Code Quality
+Phase 1.9 — Testing Infrastructure
 
 ---
 
@@ -68,8 +68,8 @@ Phase 1.8 — Code Quality
 
 # Current Objective
 
-Establish the code quality tooling phase for the FastAPI backend
-(linting, formatting, and type checking).
+Establish the testing infrastructure phase for the FastAPI backend
+(unit and integration test tooling).
 
 Do NOT implement
 
@@ -83,39 +83,37 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 1.7
+✅ Phase 1.8
 
 Completed
 
-- Reusable Pydantic response models in `app/schemas/response.py`:
-  `SuccessResponse[T]`, `ErrorResponse`, `MessageResponse`, and
-  `HealthResponse`; `ErrorResponse` matches the JSON contract already
-  produced by the global exception handlers
-- Reusable pagination schemas in `app/schemas/pagination.py`:
-  `PaginationMeta` and generic `PaginatedResponse[T]`; no pagination logic
-- Reusable common schemas in `app/schemas/common.py`: `EntityId`,
-  `Timestamp`, `CreatedAt`, `UpdatedAt`, `Metadata`, and the
-  `TimestampedModel` base class
-- Centralized API tags in `app/api/tags.py`: health, authentication,
-  users, organizations, workflows, agents, billing, admin, analytics,
-  storage (constants only)
-- Centralized response helpers in `app/api/responses.py` for success,
-  created, accepted, no-content, and error responses
-- OpenAPI document configured with title, description, version, contact,
-  license, and tag metadata via `app/api/openapi.py`; no routes modified
-- `app/core/handlers.py` refactored to build error bodies from the shared
-  `ErrorResponse` schema (single source of truth)
-- `backend/README.md` documents the API foundation
+- Ruff configured in `backend/pyproject.toml` (`[tool.ruff]`): lint,
+  format, and import sorting for Python 3.12; `app` registered as a
+  first-party package
+- MyPy configured in `backend/pyproject.toml` (`[tool.mypy]`): strict
+  mode targeting Python 3.12; no `ignore_missing_imports` overrides
+  required (FastAPI, Pydantic, structlog, and dependency-injector all
+  ship type annotations)
+- Dev dependency group added: `ruff`, `mypy`, `pre-commit`, and
+  `types-requests` (`[dependency-groups] dev`)
+- `.pre-commit-config.yaml` created at the repository root with hooks for
+  Ruff lint, Ruff format, and MyPy strict on staged backend files
+- `ruff check` and `ruff format --check` pass across `backend/app`
+- `mypy` (strict) passes across `backend/app`
+- Minimal type-annotation-only source updates required by the new tooling
+  (see Phase 1.8 Summary); no business, API, or middleware behavior changed
+- `backend/README.md` documents linting, formatting, type checking,
+  pre-commit, and the developer workflow
 
-(Previous: ✅ Phase 1.6 — Middleware infrastructure)
+(Previous: ✅ Phase 1.7 — API Foundation)
 
 ---
 
 # Next Milestone
 
-Phase 1.8
+Phase 1.9
 
-Code Quality
+Testing Infrastructure
 
 ---
 
@@ -252,20 +250,22 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/schemas/__init__.py
+- backend/pyproject.toml
 - backend/app/schemas/common.py
 - backend/app/schemas/pagination.py
 - backend/app/schemas/response.py
-- backend/app/api/tags.py
-- backend/app/api/responses.py
+- backend/app/schemas/__init__.py
 - backend/app/api/openapi.py
-- backend/app/application.py
+- backend/app/core/environments.py
+- backend/app/core/exceptions.py
 - backend/app/core/handlers.py
+- backend/app/core/logging.py
+- backend/app/dependencies.py
+- backend/app/middleware/request_id.py
+- backend/app/middleware/security_headers.py
 - backend/README.md
+- .pre-commit-config.yaml
 - docs/PROJECT_STATUS.md
-
-(Also in this sprint: the Phase 1.1-1.6 files listed in the previous
-milestone summaries.)
 
 # Pending Tasks
 
@@ -334,6 +334,23 @@ milestone summaries.)
 - [x] Centralized response helpers (`app/api/responses.py`)
 - [x] Error handlers reuse the `ErrorResponse` schema
 - [x] README documentation for the API foundation
+
+## Phase 1.8
+
+- [x] Configure Ruff (lint, format, import sorting, Python 3.12)
+- [x] Configure MyPy strict typing
+- [x] Centralize code quality configuration in `pyproject.toml`
+- [x] Create `.pre-commit-config.yaml` (Ruff lint, Ruff format, MyPy)
+- [x] Add `ruff`, `mypy`, `pre-commit`, `types-requests` dev dependencies
+- [x] README documentation for code quality
+
+## Phase 1.9
+
+- [ ] Add pytest and pytest-asyncio dev dependencies
+- [ ] Configure pytest in `pyproject.toml`
+- [ ] HTTP-based test client (httpx) for the FastAPI application
+- [ ] Unit tests for existing modules
+- [ ] README documentation for testing
 
 ---
 
@@ -427,11 +444,121 @@ Completed
 
 - Phase 1.7 API Foundation
 
+Session 9
+
+Completed
+
+- Phase 1.8 Code Quality
+
 Next Session
 
-Phase 1.8
+Phase 1.9
 
-Code Quality
+Testing Infrastructure
+
+---
+
+# Phase 1.8 Summary
+
+## Files Created
+
+- .pre-commit-config.yaml
+
+## Files Modified
+
+- backend/pyproject.toml
+- backend/app/schemas/common.py
+- backend/app/schemas/pagination.py
+- backend/app/schemas/response.py
+- backend/app/schemas/__init__.py
+- backend/app/api/openapi.py
+- backend/app/core/environments.py
+- backend/app/core/exceptions.py
+- backend/app/core/handlers.py
+- backend/app/core/logging.py
+- backend/app/dependencies.py
+- backend/app/middleware/request_id.py
+- backend/app/middleware/security_headers.py
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+- ruff (dev group, `[dependency-groups] dev`)
+- mypy (dev group)
+- pre-commit (dev group)
+- types-requests (dev group)
+- Lockfile (`uv.lock`) update deferred to manual verification via `uv sync`
+
+## Verification Results
+
+- `ruff check` passes across `backend/app` (rule set: E, W, F, I, UP, B,
+  SIM, C4, RUF, ASYNC, S, A; `ASYNC220` and `UP040` exempted).
+- `ruff format --check` passes across `backend/app`.
+- `mypy --strict` passes across `backend/app` with no `ignore_missing_imports`
+  overrides; all runtime dependencies ship type annotations.
+- `.pre-commit-config.yaml` at the repository root configures Ruff lint,
+  Ruff format, and MyPy hooks for staged backend files.
+- All configuration is centralized in `backend/pyproject.toml`; no
+  `.ruff.toml`, `.mypy.ini`, or Black configuration was introduced.
+- Runtime smoke test: `SuccessResponse[int]`, `PaginatedResponse[int]`,
+  `TimestampedModel`, `Environment` (StrEnum), `_error_payload`, and
+  `create_application()` all behave as before the annotation changes.
+- No business logic, API behavior, authentication, database, AI, or Docker
+  changes were made.
+
+## Source Updates Required by the Tooling (type/format only)
+
+The new toolchain exposed a small number of strict-mode and lint findings.
+All fixes are semantic no-ops:
+
+- `app/core/exceptions.py`: parameterized `details` as `dict[str, Any] | None`.
+- `app/core/handlers.py`: parameterized `_error_payload`; registered the
+  three narrow exception handlers through `cast(ExceptionHandler, ...)`
+  because Starlette types handler callables against `Exception`.
+- `app/core/logging.py`: `cast` the `structlog.get_logger(...).bind(...)`
+  result to `structlog.BoundLogger`.
+- `app/dependencies.py`: `cast` `request.app.state.container` to
+  `ApplicationContainer`.
+- `app/middleware/request_id.py`: annotated the `__init__` `app` parameter
+  as `ASGIApp`.
+- `app/middleware/security_headers.py`: annotated `headers` as
+  `ClassVar[dict[str, str]]`.
+- `app/core/environments.py`: `Environment` now inherits from `StrEnum`
+  (UP042).
+- `app/schemas/common.py`: `timezone.utc` replaced with the `UTC` alias
+  (UP017).
+- `app/schemas/response.py` and `app/schemas/pagination.py`: converted
+  `SuccessResponse[T]` and `PaginatedResponse[T]` to PEP 695 type-parameter
+  syntax (UP046); removed the now-unused `TypeVar`/`Generic` imports.
+- `app/schemas/__init__.py`: sorted `__all__` (RUF022).
+- `app/api/openapi.py` and `app/schemas/pagination.py`: reformatted by Ruff
+  formatter for the 88-column limit (E501).
+
+---
+
+# Phase 1.8 Suggestions (Not Implemented)
+
+- The pre-commit MyPy hook builds its own environment from
+  `additional_dependencies`. A future phase could switch the hook to reuse
+  the project's `.venv` (for example with `--python-executable`) so the
+  hook and `uv run mypy` are guaranteed to resolve identical package
+  versions.
+- `types-requests` is installed preemptively; the current code never imports
+  `requests`, so it is only needed once HTTP clients land in later phases.
+- Ruff's `ASYNC220` exemption means async exception handlers that perform no
+  `await` are not flagged. If those handlers are later converted to
+  synchronous handlers (FastAPI supports both), the exemption could be
+  removed.
+- The `UP040` exemption keeps `typing.TypeAlias` aliases in
+  `app/schemas/common.py` so their inline docstrings survive. If the aliases
+  are ever converted to PEP 695 `type` statements, the exemption can be
+  dropped.
+- The hooks currently target only `backend/app`. Frontend hooks (ESLint,
+  Prettier) and hooks for the remaining Python subsystems can be added to
+  `.pre-commit-config.yaml` as those subsystems are built.
+- The `[dependency-groups] dev` group is not yet reflected in `uv.lock`;
+  running `uv sync` after this phase pins the new dev dependencies.
 
 ---
 
@@ -716,6 +843,8 @@ feat(phase-1.5): add global exception handling
 feat(phase-1.6): add middleware infrastructure
 
 feat(phase-1.7): add API foundation
+
+feat(phase-1.8): add code quality infrastructure
 ```
 
 ---
@@ -724,13 +853,12 @@ feat(phase-1.7): add API foundation
 
 Current phase is complete when:
 
-- FastAPI application starts successfully.
-- Project structure follows architecture.
-- Health endpoint responds.
-- Logging works.
-- Configuration loads correctly.
-- Docker build succeeds.
-- No authentication or database logic has been implemented.
+- `ruff check` passes.
+- `ruff format --check` passes.
+- `mypy` (strict) passes.
+- Pre-commit configuration exists.
+- Code quality configuration is centralized in `pyproject.toml`.
+- No authentication, database, or business logic has been implemented.
 
 ---
 

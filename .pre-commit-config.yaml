@@ -1,0 +1,45 @@
+# TWIB pre-commit configuration.
+#
+# Hooks currently cover the backend package only (Ruff lint, Ruff format,
+# and MyPy strict type checking). Other subsystems will register their own
+# hooks as they mature.
+#
+# Install:
+#   cd backend
+#   uv sync --group dev
+#   uv run pre-commit install
+#
+# Run on every file:
+#   uv run pre-commit run --all-files
+
+default_language_version:
+  python: python3.12
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff
+        name: ruff lint (backend)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^backend/app/.*\.py$
+
+      - id: ruff-format
+        name: ruff format (backend)
+        files: ^backend/app/.*\.py$
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.0
+    hooks:
+      - id: mypy
+        name: mypy strict (backend)
+        args: [--config-file, backend/pyproject.toml, backend/app]
+        pass_filenames: false
+        files: ^backend/
+        additional_dependencies:
+          - dependency-injector>=4.41
+          - fastapi>=0.115
+          - pydantic>=2.7
+          - pydantic-settings>=2.0
+          - structlog>=24.1
+          - types-requests>=2.32
