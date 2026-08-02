@@ -37,7 +37,10 @@ memberships, membership statuses, subscription plans, organization
 statuses, domain events, and business-rule exceptions), and the Phase 2.5
 workspace domain (the Workspace aggregate root with memberships, workspace
 roles, immutable settings, workspace statuses, domain events, and
-business-rule exceptions).
+business-rule exceptions), and the Phase 2.6 repository interfaces
+(framework-independent `typing.Protocol` persistence contracts for the user,
+organization, and workspace repositories plus the unit of work, with no
+database or persistence implementation).
 
 ## Structure
 
@@ -127,6 +130,13 @@ backend/
 │   │       ├── status.py       # WorkspaceStatus
 │   │       ├── events.py       # Workspace domain events
 │   │       └── exceptions.py   # Workspace business-rule exceptions
+│   │   └── repositories/       # Repository interfaces (persistence contracts)
+│   │       ├── __init__.py     # Public repository exports
+│   │       ├── base.py         # Repository[T, ID] generic contract
+│   │       ├── unit_of_work.py # UnitOfWork transaction boundary
+│   │       ├── user_repository.py         # UserRepository
+│   │       ├── organization_repository.py # OrganizationRepository
+│   │       └── workspace_repository.py    # WorkspaceRepository
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -336,6 +346,7 @@ can be reused by every future module (Clean Architecture).
 | `users/`         | User aggregate, roles, statuses, events, exceptions |
 | `organizations/` | Organization aggregate, memberships, plans, statuses, events, exceptions |
 | `workspaces/`    | Workspace aggregate, memberships, settings, statuses, events, exceptions |
+| `repositories/`  | Persistence contracts: `Repository`, `UserRepository`, `OrganizationRepository`, `WorkspaceRepository`, `UnitOfWork` |
 
 ### Entities
 
@@ -851,6 +862,115 @@ hierarchy:
 
 Outer layers translate these into their own error contract (for example the
 FastAPI `TWIBException` hierarchy in `app/core/exceptions.py`).
+
+## Repository Interfaces
+
+The persistence contracts of the platform are defined in
+`app/domain/repositories/`. Repositories abstract all persistence behind
+domain-owned `typing.Protocol` interfaces, so the domain and application
+layers never depend on a database, ORM, or framework (Clean Architecture /
+Repository Pattern). Only the interfaces exist in this phase; concrete
+implementations belong to the database infrastructure phase.
+
+### Repository Pattern
+
+Application services persist and load aggregates only through repository
+interfaces. The implementation (for example a SQLAlchemy-backed repository)
+lives in the infrastructure layer and satisfies the interface structurally,
+so swapping the database never changes business logic:
+
+```text
+Application Service
+        |
+        v
+Repository Interface       (app/domain/repositories/)
+        |
+        v
+Repository Implementation  (database layer, later phase)
+        |
+        v
+Database
+```
+
+Repositories save and load **aggregates as a whole** and never contain
+business rules. Aggregate roots expose their pending domain events through
+`pull_domain_events()`, which the application layer publishes after a
+successful commit.
+
+### Generic Repository
+
+`Repository` in `app/domain/repositories/base.py` is the generic persistence
+contract shared by every aggregate repository:
+
+| Method        | Purpose                                    |
+| ------------- | ------------------------------------------ |
+| `get_by_id()` | Load an aggregate by identity              |
+| `exists()`    | Check whether an identity exists           |
+| `save()`      | Persist an aggregate (insert or update)    |
+| `delete()`    | Delete an aggregate by identity            |
+
+Concrete repositories deliberately avoid an unrestricted generic CRUD surface
+and expose only the business-oriented queries the application needs.
+
+### Repository Interfaces
+
+Each aggregate has a small, focused repository protocol:
+
+| Repository               | Interface                                            | Key methods                                                        |
+| ------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `UserRepository`         | `app/domain/repositories/user_repository.py`         | `find_by_email()`, `find_by_id()`, `exists_by_email()`             |
+| `OrganizationRepository` | `app/domain/repositories/organization_repository.py` | `find_by_slug()`, `find_by_owner()`, `exists_by_slug()`            |
+| `WorkspaceRepository`    | `app/domain/repositories/workspace_repository.py`    | `find_by_slug()`, `find_by_organization()`, `find_by_owner()`, `exists_by_slug()` |
+
+All three repositories also expose `save()` and `delete()`. Every method takes
+and returns the domain value objects and aggregates defined in the domain
+layer (`Email`, `Slug`, `UuidIdentity`, `User`, `Organization`, `Workspace`),
+so the contracts are fully typed and framework-independent:
+
+```python
+from typing import Protocol
+
+from app.domain.users import User
+from app.domain.value_objects import Email, UuidIdentity
+
+
+class UserRepository(Protocol):
+    async def find_by_email(self, email: Email) -> User | None: ...
+    async def find_by_id(self, id_: UuidIdentity) -> User | None: ...
+    async def exists_by_email(self, email: Email) -> bool: ...
+    async def save(self, user: User) -> None: ...
+    async def delete(self, id_: UuidIdentity) -> None: ...
+```
+
+### Unit of Work
+
+`UnitOfWork` in `app/domain/repositories/unit_of_work.py` groups the three
+repositories into a single business transaction. A use case acquires one unit
+of work, performs its repository operations, and calls `commit()` exactly once
+(or `rollback()` on failure), so a business operation persists atomically:
+
+```python
+from typing import Protocol
+
+from app.domain.repositories import (
+    OrganizationRepository,
+    UserRepository,
+    WorkspaceRepository,
+)
+
+
+class UnitOfWork(Protocol):
+    users: UserRepository
+    organizations: OrganizationRepository
+    workspaces: WorkspaceRepository
+
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
+```
+
+No implementation exists yet: the concrete unit of work (session-bound
+repositories, `commit()`, `rollback()`) is provided by the database
+infrastructure phase.
 
 ## Dependency Injection
 
@@ -1607,6 +1727,12 @@ deferred until those subsystems exist.
   The owner is an implicit active OWNER-role member; archived workspaces are
   immutable until restored. No infrastructure (databases, caches, LLM
   clients), repository, or API code exists in the domain layer.
+- The repository interfaces in `app/domain/repositories/` define the
+  persistence contracts (`Repository` generic contract, `UserRepository`,
+  `OrganizationRepository`, `WorkspaceRepository`, and `UnitOfWork`) as
+  `typing.Protocol`s. They depend only on the domain layer and the standard
+  library; no SQLAlchemy, database, ORM, or repository implementation exists
+  in the domain layer.
 - Logging, dependency injection, exception handling, middleware, the API
   foundation (schemas, tags, response helpers, OpenAPI metadata), and the
   observability foundation (request context, event definitions, metrics and

@@ -29,7 +29,7 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        █████████████████░░░░  85%
+Domain Layer        ██████████████████░░  90%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -49,8 +49,9 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 ```
 
 > Domain Layer: Phases 2.1 (base classes, exceptions), 2.2 (concrete
-> value objects), 2.3 (user domain), 2.4 (organization domain), and 2.5
-> (workspace domain) are complete; repository interfaces follow in Phase 2.6.
+> value objects), 2.3 (user domain), 2.4 (organization domain), 2.5
+> (workspace domain), and 2.6 (repository interfaces) are complete;
+> database infrastructure begins in Phase 3.1.
 
 ---
 
@@ -62,7 +63,7 @@ Sprint 2
 
 # Current Phase
 
-Phase 2.6 — Repository Interfaces
+Phase 3.1 — Database Infrastructure
 
 ---
 
@@ -74,74 +75,61 @@ Phase 2.6 — Repository Interfaces
 
 # Current Objective
 
-Define the repository interfaces for the domain aggregates (user, organization,
-workspace) as framework-independent protocols, establishing the persistence
-contracts application services depend on.
+Lay the database infrastructure foundation: SQLAlchemy 2.0 async engine and
+session management wired through the dependency injection container,
+implementing the Phase 2.6 repository interfaces as concrete, typed
+repositories (user, organization, workspace) backed by a Unit of Work.
 
 Do NOT implement
 
-- Database models
-- SQLAlchemy
-- Repository implementations
 - API routes
 - Authentication
+- Billing
+- LLM integrations
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 2.5
+✅ Phase 2.6
 
 Completed
 
-- `backend/app/domain/workspaces/` package with six files (`__init__.py`,
-  `workspace.py`, `membership.py`, `settings.py`, `status.py`, `events.py`,
-  `exceptions.py`)
-- `Workspace` aggregate root built entirely from the Phase 2.2 value objects
-  (`UuidIdentity`, `Name`, `Slug`, `Description`, `Timestamp`, `Metadata`,
-  `Version`), the `WorkspaceStatus` enum, and the `WorkspaceSettings` domain
-  object
-- Immutable `WorkspaceMembership` domain object (user ID, workspace role,
-  joined time, membership status, invitation-accepted flag) plus the
-  `WorkspaceRole` `StrEnum` (owner, admin, editor, contributor, viewer) and
-  `WorkspaceMembershipStatus` `StrEnum` (pending, active, inactive)
-- Immutable `WorkspaceSettings` domain object (timezone, default language,
-  visibility, AI model preference, execution limits, knowledge-base toggle,
-  experimental-features toggle) plus the `WorkspaceVisibility` `StrEnum`
-  (private, organization, public)
-- `WorkspaceStatus` `StrEnum` (active, archived, suspended, deleted)
-- Workspace domain events (`WorkspaceCreated`, `WorkspaceArchived`,
-  `WorkspaceRenamed`, `WorkspaceOwnerChanged`, `WorkspaceMemberAdded`,
-  `WorkspaceMemberRemoved`, `WorkspaceSettingsChanged`)
-- Workspace business-rule exceptions (`InvalidWorkspaceState`,
-  `WorkspaceArchived`, `WorkspaceAlreadyExists`, `DuplicateWorkspaceMember`,
-  `OwnerCannotBeRemoved`)
-- Domain methods (`rename`, `change_slug`, `change_description`, `change_owner`,
-  `archive`, `restore`, `activate`, `suspend`, `add_member`, `remove_member`,
-  `update_settings`, `update_metadata`, `increment_version`) that validate,
-  record events, refresh `updated_at`, and auto-bump the optimistic-locking
-  version
-- The owner is implicitly added as an active OWNER-role member; the owner
-  cannot be removed, and changing the owner swaps roles (new owner becomes
-  OWNER, previous owner becomes ADMIN)
-- Archived workspaces are immutable until restored; deleted workspaces cannot
-  be modified
-- New `Description` value object (`backend/app/domain/value_objects/description.py`)
-  for free-text descriptions (max 500 characters; may be empty)
-- Pure Python with no FastAPI, Pydantic, SQLAlchemy, repositories, billing,
-  infrastructure, or authentication code
-- `backend/README.md` documents the workspace aggregate, memberships, settings,
-  statuses, domain events, and business-rule exceptions
+- `backend/app/domain/repositories/` package with six files (`__init__.py`,
+  `base.py`, `unit_of_work.py`, `user_repository.py`,
+  `organization_repository.py`, `workspace_repository.py`)
+- Generic `Repository[TEntity, TID]` persistence contract (`get_by_id`,
+  `exists`, `save`, `delete`) that repositories always apply to aggregates as
+  a whole
+- `UserRepository` protocol with business-oriented methods (`find_by_email`,
+  `find_by_id`, `exists_by_email`, `save`, `delete`)
+- `OrganizationRepository` protocol with business-oriented methods
+  (`find_by_slug`, `find_by_owner`, `exists_by_slug`, `save`, `delete`)
+- `WorkspaceRepository` protocol with business-oriented methods
+  (`find_by_slug`, `find_by_organization`, `find_by_owner`, `exists_by_slug`,
+  `save`, `delete`); workspace slugs are scoped to a parent organization
+- `UnitOfWork` protocol exposing `users`, `organizations`, and `workspaces`
+  repositories plus `commit()` and `rollback()` for atomic business
+  transactions
+- Every contract is a `typing.Protocol` that takes and returns the Phase 2.2
+  value objects and the Phase 2.3/2.4/2.5 aggregates (`Email`, `Slug`,
+  `UuidIdentity`, `User`, `Organization`, `Workspace`)
+- Pure Python with no SQLAlchemy, database models, repository
+  implementations, FastAPI, ORM, or infrastructure code
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`
+- `mypy --strict` passes across `backend/app/domain` (44 source files)
+- `backend/README.md` documents the repository pattern, the generic
+  repository, the aggregate repository interfaces, and the unit of work
 
-(Previous: ✅ Phase 2.4)
+(Previous: ✅ Phase 2.5)
 
 ---
 
 # Next Milestone
 
-Phase 2.6
+Phase 3.1
 
-Repository Interfaces
+Database Infrastructure
 
 ---
 
@@ -278,15 +266,12 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/value_objects/description.py (created)
-- backend/app/domain/value_objects/__init__.py (exported `Description`)
-- backend/app/domain/workspaces/__init__.py (created)
-- backend/app/domain/workspaces/workspace.py (created)
-- backend/app/domain/workspaces/membership.py (created)
-- backend/app/domain/workspaces/settings.py (created)
-- backend/app/domain/workspaces/status.py (created)
-- backend/app/domain/workspaces/events.py (created)
-- backend/app/domain/workspaces/exceptions.py (created)
+- backend/app/domain/repositories/__init__.py (created)
+- backend/app/domain/repositories/base.py (created)
+- backend/app/domain/repositories/unit_of_work.py (created)
+- backend/app/domain/repositories/user_repository.py (created)
+- backend/app/domain/repositories/organization_repository.py (created)
+- backend/app/domain/repositories/workspace_repository.py (created)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -473,11 +458,11 @@ _Not committed yet_
 
 ## Phase 2.6
 
-- [ ] Repository interfaces package (`backend/app/domain/repositories/`)
-- [ ] `UserRepository` protocol
-- [ ] `OrganizationRepository` protocol
-- [ ] `WorkspaceRepository` protocol
-- [ ] README documentation for the repository interfaces
+- [x] Repository interfaces package (`backend/app/domain/repositories/`)
+- [x] `UserRepository` protocol
+- [x] `OrganizationRepository` protocol
+- [x] `WorkspaceRepository` protocol
+- [x] README documentation for the repository interfaces
 
 ---
 
@@ -644,11 +629,20 @@ Completed
   memberships and settings, workspace roles and statuses, domain events,
   business-rule exceptions, Description value object)
 
+Session 20
+
+Completed
+
+- Phase 2.6 Repository Interfaces (generic `Repository` contract,
+  `UserRepository`, `OrganizationRepository`, and `WorkspaceRepository`
+  protocols, and the `UnitOfWork` transaction boundary, all pure
+  `typing.Protocol` contracts with no persistence implementation)
+
 Next Session
 
-Phase 2.6
+Phase 3.1
 
-Repository Interfaces
+Database Infrastructure
 
 ---
 
@@ -1067,6 +1061,105 @@ None
 - `folder_structure.md` still lists `app/models/` as the future home of
   domain models; the implemented home is `app/domain/`. The docs can be
   aligned when the roadmap is next updated.
+
+---
+
+# Phase 2.6 Summary
+
+## Files Created
+
+- backend/app/domain/repositories/__init__.py
+- backend/app/domain/repositories/base.py
+- backend/app/domain/repositories/unit_of_work.py
+- backend/app/domain/repositories/user_repository.py
+- backend/app/domain/repositories/organization_repository.py
+- backend/app/domain/repositories/workspace_repository.py
+
+## Files Modified
+
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+None
+
+## Verification Results
+
+- `Repository[TEntity, TID]` (`app/domain/repositories/base.py`) is the
+  generic persistence contract (`get_by_id()`, `exists()`, `save()`,
+  `delete()`). It is a `typing.Protocol` satisfied structurally, documents
+  that repositories persist aggregates as a whole, and intentionally avoids
+  an unrestricted generic CRUD surface.
+- `UserRepository` (`app/domain/repositories/user_repository.py`) exposes
+  `find_by_email()`, `find_by_id()`, `exists_by_email()`, `save()`, and
+  `delete()`.
+- `OrganizationRepository`
+  (`app/domain/repositories/organization_repository.py`) exposes
+  `find_by_slug()`, `find_by_owner()`, `exists_by_slug()`, `save()`, and
+  `delete()`.
+- `WorkspaceRepository`
+  (`app/domain/repositories/workspace_repository.py`) exposes
+  `find_by_slug()`, `find_by_organization()`, `find_by_owner()`,
+  `exists_by_slug()`, `save()`, and `delete()`. Workspace slugs are scoped
+  to a parent organization, so slug lookups are organization-aware.
+- `UnitOfWork` (`app/domain/repositories/unit_of_work.py`) exposes the
+  `users`, `organizations`, and `workspaces` repositories plus `commit()`
+  and `rollback()`, giving every business transaction a single atomic commit
+  point.
+- Every method takes and returns the Phase 2.2 value objects and the
+  Phase 2.3/2.4/2.5 aggregates (`Email`, `Slug`, `UuidIdentity`, `User`,
+  `Organization`, `Workspace`), so the contracts are fully typed.
+- All contracts are pure Python (`typing.Protocol`) with no SQLAlchemy,
+  database models, repository implementations, FastAPI, ORM, or
+  infrastructure code.
+- `ruff check` and `ruff format --check` pass across `backend/app/domain`.
+- `mypy --strict` passes across `backend/app/domain` (44 source files).
+- No authentication, database, repository implementation, API route, or
+  external dependency was added.
+
+## Architectural Decisions
+
+- The repository interfaces live in
+  `backend/app/domain/repositories/` as a subpackage of the domain layer
+  (per ADR-0008), so the persistence contracts are owned by the domain and
+  point inward; infrastructure implementations will depend on them.
+- The interfaces use `typing.Protocol`, so implementations are satisfied
+  structurally and no abstract-base-class coupling is imposed on the
+  database layer.
+- The generic `Repository` contract exists as the shared persistence
+  pattern, but the aggregate repositories deliberately do not inherit it:
+  each exposes exactly the business-oriented methods the application needs
+  (for example `find_by_id()` rather than generic `get_by_id()`), honoring
+  interface segregation and the "do not expose CRUD unnecessarily" rule.
+- Repositories persist aggregates as a whole (Aggregate Root pattern);
+  aggregate roots expose their pending domain events through
+  `pull_domain_events()` for the application layer to publish after a
+  commit.
+- The `UnitOfWork` groups the three aggregate repositories into one
+  transaction boundary; the concrete, session-bound unit of work will be
+  implemented in Phase 3.1.
+- Identifier parameters use the `UuidIdentity` value object (not raw
+  `uuid.UUID`), consistent with how the aggregates expose their identities.
+
+## Suggestions (Not Implemented)
+
+- No unit tests were added in this phase (running the pytest tooling is out
+  of scope per the phase rules). A future phase should add
+  `backend/tests/domain/` unit tests that assert the repository and unit of
+  work protocols accept the concrete aggregate/value-object types.
+- The repository protocols do not yet expose collection queries with
+  pagination/filtering (for example "list users"). Those belong to the
+  Phase 3.1 database layer and the roadmap's `BaseRepository` with
+  pagination and filtering.
+- `delete()` is a hard delete contract. Soft-delete support will be added
+  with the database layer if the roadmap's soft-delete requirement is kept.
+- The `UnitOfWork` protocol does not model a nested/transaction context
+  manager; a concrete `__aenter__`/`__aexit__` implementation can be added
+  in Phase 3.1.
+- No repository implementation, SQLAlchemy, or database code exists yet;
+  `folder_structure.md` still lists `app/models/` as the future home of
+  domain models, which can be aligned when the roadmap is next updated.
 
 ---
 
