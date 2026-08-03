@@ -32,6 +32,10 @@ from app.security import JWTHelper, PasswordHasher
 from app.services.api_keys import ApiKeyService
 from app.services.audit import AuditService
 from app.services.auth import AuthenticationService, SessionService
+from app.services.invitations import InvitationService
+from app.services.organizations import OrganizationService
+from app.services.users import UserService
+from app.services.workspaces import WorkspaceService
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -56,6 +60,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         authorization_service: Factory provider returning AuthorizationService.
         api_key_service: Singleton provider returning ApiKeyService.
         audit_service: Singleton provider returning AuditService.
+        user_service: Factory provider returning UserService.
     """
 
     settings = providers.Singleton(_load_settings)
@@ -90,3 +95,20 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
     api_key_service = providers.Singleton(ApiKeyService)
     audit_service = providers.Singleton(AuditService)
+    user_service = providers.Factory(
+        UserService,
+        unit_of_work=unit_of_work,
+    )
+    organization_service = providers.Factory(
+        OrganizationService,
+        unit_of_work=unit_of_work,
+    )
+    workspace_service = providers.Factory(
+        WorkspaceService,
+        unit_of_work=unit_of_work,
+    )
+    invitation_service = providers.Factory(
+        InvitationService,
+        unit_of_work=unit_of_work,
+        workspace_service=workspace_service,
+    )

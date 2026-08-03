@@ -35,7 +35,7 @@ Authentication      ████████████████████
 
 Database            ████████████████████ 100%
 
-REST API            ░░░░░░░░░░░░░░░░░░░░   0%
+REST API            ████████████████████ 100%
 
 LLM Layer           ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -50,7 +50,8 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 
 > Domain Layer: Phases 2.1 through 2.6 are 100% complete.
 > Database: Phase 3 (Persistence Layer) is 100% complete.
-> Authentication: Phase 4.1 through Phase 4.6 (Audit Logging) are complete; Identity Verification begins in Phase 4.7.
+> Authentication: Phase 4.1 through Phase 4.6 (Audit Logging) are complete.
+> REST API: Phase 5 (User Service, Organization Service, Workspace Service, Membership & Invitations, and Verification) is 100% complete.
 
 ---
 
@@ -62,7 +63,7 @@ Sprint 3
 
 # Current Phase
 
-Phase 4.7 — Identity Verification
+Phase 6 — AI Platform
 
 ---
 
@@ -74,37 +75,33 @@ Phase 4.7 — Identity Verification
 
 # Current Objective
 
-Implement Identity Verification handlers (email verification, password reset tokens, and MFA foundation).
-
-Do NOT implement
-
-- Billing
-- LLM integrations
+Build the AI Platform foundation, Model Router, and LLM Provider integrations.
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 4.6
+✅ Phase 5 (REST API & Application Services)
 
 Completed
 
-- Implemented `AuditLog` aggregate entity, standard action constants (`user.login`, `api_key.created`, etc.), and `sanitize_metadata()` automatic credential scrub in `app/domain/audit/`
-- Implemented `AuditLogRecorded` domain event in `app/domain/audit/events.py`
-- Created `AuditService` in `app/services/audit/audit_service.py` (`record()`, `get_logs()` with organization, workspace, user, action, and date range filtering)
-- Implemented `AuditLogResponse` and `AuditLogListResponse` Pydantic schemas in `app/schemas/audit/`
-- Created `GET /api/v1/audit` endpoint in `app/api/v1/audit.py` with RBAC guard (`RequireOrganizationRole(UserRole.ADMIN)`)
-- Registered `audit_service` in DI container (`app/container.py`) and FastAPI dependencies (`app/dependencies.py`)
+- Implemented `UserService` and 6 user management endpoints (`GET /me`, `PATCH /me`, `GET /users`, `GET /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}`)
+- Implemented `OrganizationService` and 5 organization management endpoints (`POST /organizations`, `GET /organizations`, `GET /organizations/{id}`, `PATCH /organizations/{id}`, `DELETE /organizations/{id}`)
+- Implemented `WorkspaceService` and 5 workspace management endpoints (`POST /workspaces`, `GET /workspaces`, `GET /workspaces/{id}`, `PATCH /workspaces/{id}`, `DELETE /workspaces/{id}`)
+- Implemented `InvitationService` and 3 invitation endpoints (`POST /invitations`, `POST /invitations/{id}/accept`, `POST /invitations/{id}/reject`)
+- Implemented workspace member management endpoints (`GET /workspaces/{id}/members`, `PATCH /workspaces/{id}/members/{user_id}`, `DELETE /workspaces/{id}/members/{user_id}`)
+- Configured OpenAPI metadata and tags (`WORKSPACES`, `INVITATIONS`, `API_KEYS`, `AUDIT`) in `app/api/openapi.py` and `app/api/tags.py`
+- Verified repository usage, Unit of Work coordination, AuthorizationService permission guards, and DI wiring
 
-(Previous: ✅ Phase 4.5)
+(Previous: ✅ Phase 4.6)
 
 ---
 
 # Next Milestone
 
-Phase 4.7
+Phase 6
 
-Identity Verification
+AI Platform
 
 ---
 

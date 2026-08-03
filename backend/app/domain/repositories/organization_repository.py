@@ -71,6 +71,30 @@ class OrganizationRepository(Protocol):
         """
         ...
 
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Organization]:
+        """Return a paginated list of organizations.
+
+        Args:
+            limit: Maximum number of organizations to return.
+            offset: Number of organizations to skip.
+
+        Returns:
+            A list of Organization aggregates.
+        """
+        ...
+
+    async def count(self) -> int:
+        """Return the total number of organizations.
+
+        Returns:
+            The total count of organizations in the repository.
+        """
+        ...
+
     async def save(self, organization: Organization) -> None:
         """Persist an organization, inserting or updating it as needed.
 

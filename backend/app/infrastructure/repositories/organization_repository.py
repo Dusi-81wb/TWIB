@@ -210,3 +210,33 @@ class SQLAlchemyOrganizationRepository(
         stmt = select(OrganizationModel.id).where(OrganizationModel.slug == slug.value)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Organization]:
+        """Return a paginated list of organizations.
+
+        Args:
+            limit: Maximum number of organizations to return.
+            offset: Number of organizations to skip.
+
+        Returns:
+            A list of Organization domain aggregates.
+        """
+        stmt = select(OrganizationModel).offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def count(self) -> int:
+        """Return the total number of organizations.
+
+        Returns:
+            The total organization count.
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.count()).select_from(OrganizationModel)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())

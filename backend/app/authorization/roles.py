@@ -74,9 +74,7 @@ def is_workspace_role_at_least(
         True if user_role rank >= required_role rank, False otherwise.
     """
     user_val = (
-        user_role.value
-        if isinstance(user_role, WorkspaceRole)
-        else str(user_role)
+        user_role.value if isinstance(user_role, WorkspaceRole) else str(user_role)
     )
     req_val = (
         required_role.value

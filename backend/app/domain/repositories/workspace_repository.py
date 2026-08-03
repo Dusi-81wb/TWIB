@@ -90,6 +90,35 @@ class WorkspaceRepository(Protocol):
         """
         ...
 
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        organization_id: UuidIdentity | None = None,
+    ) -> list[Workspace]:
+        """Return a paginated list of workspaces.
+
+        Args:
+            limit: Maximum number of workspaces to return.
+            offset: Number of workspaces to skip.
+            organization_id: Optional organization filter.
+
+        Returns:
+            A list of Workspace aggregates.
+        """
+        ...
+
+    async def count(self, organization_id: UuidIdentity | None = None) -> int:
+        """Return the total number of workspaces.
+
+        Args:
+            organization_id: Optional organization filter.
+
+        Returns:
+            The total count of workspaces.
+        """
+        ...
+
     async def save(self, workspace: Workspace) -> None:
         """Persist a workspace, inserting or updating it as needed.
 

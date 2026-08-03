@@ -139,3 +139,33 @@ class SQLAlchemyUserRepository(
         stmt = select(UserModel.id).where(UserModel.email == email.value)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[User]:
+        """Return a paginated list of users.
+
+        Args:
+            limit: Maximum number of users to return.
+            offset: Number of users to skip.
+
+        Returns:
+            A list of User domain aggregates.
+        """
+        stmt = select(UserModel).offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def count(self) -> int:
+        """Return the total number of users.
+
+        Returns:
+            The total user count.
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.count()).select_from(UserModel)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())

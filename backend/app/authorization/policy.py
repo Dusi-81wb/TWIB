@@ -38,10 +38,8 @@ from app.authorization.roles import UserRole, WorkspaceRole
 
 ORG_ROLE_PERMISSIONS: dict[str, set[str]] = {
     UserRole.OWNER.value: set(ALL_PERMISSIONS),
-    UserRole.ADMIN.value: (
-        ALL_PERMISSIONS
-        - {ORGANIZATION_DELETE}
-    ) | {ORGANIZATION_UPDATE, ORGANIZATION_MANAGE_MEMBERS},
+    UserRole.ADMIN.value: (ALL_PERMISSIONS - {ORGANIZATION_DELETE})
+    | {ORGANIZATION_UPDATE, ORGANIZATION_MANAGE_MEMBERS},
     UserRole.MEMBER.value: {
         ORGANIZATION_READ,
         WORKSPACE_READ,

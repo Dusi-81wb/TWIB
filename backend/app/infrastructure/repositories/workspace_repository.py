@@ -261,3 +261,43 @@ class SQLAlchemyWorkspaceRepository(
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        organization_id: UuidIdentity | None = None,
+    ) -> list[Workspace]:
+        """Return a paginated list of workspaces.
+
+        Args:
+            limit: Maximum number of workspaces to return.
+            offset: Number of workspaces to skip.
+            organization_id: Optional organization filter.
+
+        Returns:
+            A list of Workspace domain aggregates.
+        """
+        stmt = select(WorkspaceModel)
+        if organization_id is not None:
+            stmt = stmt.where(WorkspaceModel.organization_id == organization_id.value)
+        stmt = stmt.offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def count(self, organization_id: UuidIdentity | None = None) -> int:
+        """Return the total number of workspaces.
+
+        Args:
+            organization_id: Optional organization filter.
+
+        Returns:
+            The total workspace count.
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.count()).select_from(WorkspaceModel)
+        if organization_id is not None:
+            stmt = stmt.where(WorkspaceModel.organization_id == organization_id.value)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())

@@ -59,6 +59,30 @@ class UserRepository(Protocol):
         """
         ...
 
+    async def find_all(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[User]:
+        """Return a paginated list of users.
+
+        Args:
+            limit: Maximum number of users to return.
+            offset: Number of users to skip.
+
+        Returns:
+            A list of User aggregates.
+        """
+        ...
+
+    async def count(self) -> int:
+        """Return the total number of users.
+
+        Returns:
+            The total count of users in the repository.
+        """
+        ...
+
     async def save(self, user: User) -> None:
         """Persist a user, inserting or updating it as needed.
 

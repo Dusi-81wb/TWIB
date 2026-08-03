@@ -9,13 +9,17 @@ from app.api.tags import (
     ADMIN,
     AGENTS,
     ANALYTICS,
+    API_KEYS,
+    AUDIT,
     AUTHENTICATION,
     BILLING,
     HEALTH,
+    INVITATIONS,
     ORGANIZATIONS,
     STORAGE,
     USERS,
     WORKFLOWS,
+    WORKSPACES,
 )
 
 DESCRIPTION = """
@@ -45,7 +49,11 @@ OPENAPI_TAGS = [
     {"name": HEALTH, "description": "Service health and liveness checks."},
     {"name": AUTHENTICATION, "description": "Identity, login, and session management."},
     {"name": USERS, "description": "User account management."},
-    {"name": ORGANIZATIONS, "description": "Organization and workspace management."},
+    {"name": ORGANIZATIONS, "description": "Organization tenant management."},
+    {"name": WORKSPACES, "description": "Workspace collaboration boundaries."},
+    {"name": INVITATIONS, "description": "Workspace invitations and membership flow."},
+    {"name": API_KEYS, "description": "Workspace API key management."},
+    {"name": AUDIT, "description": "Security audit logging and compliance."},
     {
         "name": WORKFLOWS,
         "description": "Workflow generation, execution, and monitoring.",

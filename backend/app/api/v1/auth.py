@@ -63,9 +63,7 @@ auth_router = APIRouter(prefix="/auth", tags=[AUTHENTICATION])
         401: {
             "description": "Invalid email or password.",
             "content": {
-                "application/json": {
-                    "example": {"detail": "Invalid email or password"}
-                }
+                "application/json": {"example": {"detail": "Invalid email or password"}}
             },
         },
         422: {
@@ -180,9 +178,7 @@ async def refresh(
         200: {
             "description": "Successfully logged out.",
             "content": {
-                "application/json": {
-                    "example": {"message": "Successfully logged out"}
-                }
+                "application/json": {"example": {"message": "Successfully logged out"}}
             },
         }
     },
@@ -247,9 +243,7 @@ async def logout_all(
             old_hash = hash_refresh_token(payload.refresh_token)
             session_id = await session_service._redis.get(f"refresh_hash:{old_hash}")
             if session_id:
-                session_json = await session_service._redis.get(
-                    f"session:{session_id}"
-                )
+                session_json = await session_service._redis.get(f"session:{session_id}")
                 if session_json:
                     session_data = SessionData.from_json(session_json)
                     target_user_id = session_data.user_id

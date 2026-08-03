@@ -110,9 +110,7 @@ async def get_audit_logs(
             organization_id=str(log.organization_id.value)
             if log.organization_id
             else None,
-            workspace_id=str(log.workspace_id.value)
-            if log.workspace_id
-            else None,
+            workspace_id=str(log.workspace_id.value) if log.workspace_id else None,
             user_id=str(log.user_id.value) if log.user_id else None,
             action=log.action,
             resource_type=log.resource_type,

@@ -25,6 +25,10 @@ from app.security.exceptions import InvalidTokenError, TokenExpiredError
 from app.services.api_keys import ApiKeyService
 from app.services.audit import AuditService
 from app.services.auth import AuthenticationService, SessionService
+from app.services.invitations import InvitationService
+from app.services.organizations import OrganizationService
+from app.services.users import UserService
+from app.services.workspaces import WorkspaceService
 
 
 def get_container(request: Request) -> ApplicationContainer:
@@ -242,7 +246,69 @@ def get_current_user_claims(
         ) from err
 
 
+def get_user_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> UserService:
+    """Resolve the UserService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        A ``UserService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.user_service(unit_of_work=uow)
 
 
+def get_organization_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> OrganizationService:
+    """Resolve the OrganizationService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        An ``OrganizationService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.organization_service(unit_of_work=uow)
 
 
+def get_workspace_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> WorkspaceService:
+    """Resolve the WorkspaceService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        A ``WorkspaceService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.workspace_service(unit_of_work=uow)
+
+
+def get_invitation_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> InvitationService:
+    """Resolve the InvitationService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        An ``InvitationService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.invitation_service(unit_of_work=uow)
