@@ -19,6 +19,7 @@ from app.core.settings import ApplicationSettings
 from app.domain.repositories.unit_of_work import UnitOfWork
 from app.infrastructure.cache import RedisClient
 from app.infrastructure.database.session import get_session
+from app.infrastructure.llm import LLMProviderFactory
 from app.infrastructure.vector import VectorStoreClient
 from app.security import JWTHelper, PasswordHasher
 from app.security.exceptions import InvalidTokenError, TokenExpiredError
@@ -312,3 +313,18 @@ def get_invitation_service(
     """
     container = get_container(request)
     return container.invitation_service(unit_of_work=uow)
+
+
+def get_llm_provider_factory(
+    request: Request,
+) -> LLMProviderFactory:
+    """Resolve the LLMProviderFactory instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+
+    Returns:
+        The singleton ``LLMProviderFactory`` instance.
+    """
+    container = get_container(request)
+    return container.llm_provider_factory()

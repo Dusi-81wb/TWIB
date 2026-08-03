@@ -55,4 +55,5 @@ class ApplicationSettings(BaseSettings):
     redis_url: str = ""
     qdrant_url: str = ""
     ollama_base_url: str = ""
+    openai_api_key: str = ""
     cors_origins: list[str] = Field(default_factory=list)

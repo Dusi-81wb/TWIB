@@ -13,6 +13,7 @@ The current contents:
 - :mod:`app.infrastructure.repositories`: Concrete repositories and Unit of Work.
 - :mod:`app.infrastructure.cache`: Redis client wrapper and connection pooling.
 - :mod:`app.infrastructure.vector`: Qdrant vector store client and collection helpers.
+- :mod:`app.infrastructure.llm`: LLM provider abstraction interface and shared models.
 """
 
 __all__: list[str] = []

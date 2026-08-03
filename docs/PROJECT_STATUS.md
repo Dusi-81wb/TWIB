@@ -37,7 +37,7 @@ Database            ████████████████████
 
 REST API            ████████████████████ 100%
 
-LLM Layer           ░░░░░░░░░░░░░░░░░░░░   0%
+LLM Layer           ████████████████████ 100%
 
 Agents              ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -52,6 +52,7 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 > Database: Phase 3 (Persistence Layer) is 100% complete.
 > Authentication: Phase 4.1 through Phase 4.6 (Audit Logging) are complete.
 > REST API: Phase 5 (User Service, Organization Service, Workspace Service, Membership & Invitations, and Verification) is 100% complete.
+> LLM Layer: Phase 6 (Provider Abstraction, OpenAI Provider, Ollama Provider, Registry, Factory, Conversation, Streaming, and Verification) is 100% complete.
 
 ---
 
@@ -63,7 +64,7 @@ Sprint 3
 
 # Current Phase
 
-Phase 6 — AI Platform
+Phase 7.1 — Agent Core
 
 ---
 
@@ -75,33 +76,38 @@ Phase 6 — AI Platform
 
 # Current Objective
 
-Build the AI Platform foundation, Model Router, and LLM Provider integrations.
+Build the core Agent framework, specifications, state, and execution loop.
+
+Do NOT implement
+
+- Workflow DAG engine
+- Frontend UI
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 5 (REST API & Application Services)
+✅ Phase 6 (LLM Platform)
 
 Completed
 
-- Implemented `UserService` and 6 user management endpoints (`GET /me`, `PATCH /me`, `GET /users`, `GET /users/{id}`, `PATCH /users/{id}`, `DELETE /users/{id}`)
-- Implemented `OrganizationService` and 5 organization management endpoints (`POST /organizations`, `GET /organizations`, `GET /organizations/{id}`, `PATCH /organizations/{id}`, `DELETE /organizations/{id}`)
-- Implemented `WorkspaceService` and 5 workspace management endpoints (`POST /workspaces`, `GET /workspaces`, `GET /workspaces/{id}`, `PATCH /workspaces/{id}`, `DELETE /workspaces/{id}`)
-- Implemented `InvitationService` and 3 invitation endpoints (`POST /invitations`, `POST /invitations/{id}/accept`, `POST /invitations/{id}/reject`)
-- Implemented workspace member management endpoints (`GET /workspaces/{id}/members`, `PATCH /workspaces/{id}/members/{user_id}`, `DELETE /workspaces/{id}/members/{user_id}`)
-- Configured OpenAPI metadata and tags (`WORKSPACES`, `INVITATIONS`, `API_KEYS`, `AUDIT`) in `app/api/openapi.py` and `app/api/tags.py`
-- Verified repository usage, Unit of Work coordination, AuthorizationService permission guards, and DI wiring
+- Implemented abstract `LLMProvider` contract (`complete()`, `stream()`, `list_models()`, `health_check()`) in `app/infrastructure/llm/provider.py`
+- Implemented `OpenAIProvider` (`app/infrastructure/llm/providers/openai_provider.py`) backed by `openai.AsyncOpenAI` SDK
+- Implemented `OllamaProvider` (`app/infrastructure/llm/providers/ollama_provider.py`) backed by local Ollama REST API over `httpx`
+- Implemented `LLMProviderRegistry` & `LLMProviderFactory` (`app/infrastructure/llm/registry.py` and `factory.py`) with pre-registered `"openai"` and `"ollama"` providers
+- Implemented `Conversation` message state container (`app/infrastructure/llm/conversation.py`) and `AsyncStreamWrapper` (`app/infrastructure/llm/streaming.py`)
+- Registered `llm_provider_factory` in DI container (`app/container.py`) and FastAPI dependencies (`app/dependencies.py`)
+- Verified provider exception mapping, async streaming, cancellation, and alias module exports in `app.llm.*`
 
-(Previous: ✅ Phase 4.6)
+(Previous: ✅ Phase 5)
 
 ---
 
 # Next Milestone
 
-Phase 6
+Phase 7.1
 
-AI Platform
+Agent Core
 
 ---
 

@@ -19,6 +19,7 @@ from app.authorization.authorization_service import AuthorizationService
 from app.core.config import get_settings as _load_settings
 from app.core.logging import get_logger as _resolve_logger
 from app.infrastructure.cache import get_redis_client as _resolve_redis_client
+from app.infrastructure.llm import LLMProviderFactory
 from app.infrastructure.repositories import (
     SQLAlchemyOrganizationRepository,
     SQLAlchemyUnitOfWork,
@@ -111,4 +112,8 @@ class ApplicationContainer(containers.DeclarativeContainer):
         InvitationService,
         unit_of_work=unit_of_work,
         workspace_service=workspace_service,
+    )
+    llm_provider_factory = providers.Singleton(
+        LLMProviderFactory,
+        settings=settings,
     )
