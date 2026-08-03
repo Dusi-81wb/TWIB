@@ -5,10 +5,15 @@ description = "TWIB backend FastAPI application."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.13",
+    "asyncpg>=0.29",
     "dependency-injector>=4.41",
     "fastapi>=0.115",
     "pydantic>=2.7",
     "pydantic-settings>=2.0",
+    "qdrant-client>=1.9",
+    "redis>=5.0",
+    "sqlalchemy>=2.0",
     "structlog>=24.1",
     "uvicorn>=0.30",
 ]
@@ -32,7 +37,7 @@ package = false
 target-version = "py312"
 line-length = 88
 src = ["."]
-exclude = [".venv"]
+exclude = [".venv", "migrations"]
 
 [tool.ruff.lint]
 select = [
@@ -52,6 +57,7 @@ select = [
 ignore = [
     "ASYNC220",  # async exception handlers legitimately await nothing
     "UP040",     # keep typing.TypeAlias aliases so alias docstrings survive
+    "B008",      # FastAPI Depends() in default parameters
 ]
 
 [tool.ruff.lint.per-file-ignores]

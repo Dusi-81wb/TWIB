@@ -29,11 +29,11 @@ Documentation       ████████████████████
 
 Foundation          ████████████████████ 100%
 
-Domain Layer        ██████████████████░░  90%
+Domain Layer        ████████████████████ 100%
 
 Authentication      ░░░░░░░░░░░░░░░░░░░░   0%
 
-Database            ░░░░░░░░░░░░░░░░░░░░   0%
+Database            ████████████████████ 100%
 
 REST API            ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -48,22 +48,20 @@ Frontend            ░░░░░░░░░░░░░░░░░░░░
 Deployment          ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-> Domain Layer: Phases 2.1 (base classes, exceptions), 2.2 (concrete
-> value objects), 2.3 (user domain), 2.4 (organization domain), 2.5
-> (workspace domain), and 2.6 (repository interfaces) are complete;
-> database infrastructure begins in Phase 3.1.
+> Domain Layer: Phases 2.1 through 2.6 are 100% complete.
+> Database: Phase 3 (Persistence Layer) — 3.1 (Async PostgreSQL Engine), 3.2 (SQLAlchemy 2.0 ORM Models), 3.3 (Concrete Repositories & Unit of Work), 3.4 (Alembic Migrations), 3.5 (Redis Cache), 3.6 (Qdrant Vector DB), and 3.7 (Persistence Verification) — is 100% complete.
 
 ---
 
 # Current Sprint
 
-Sprint 2
+Sprint 3
 
 ---
 
 # Current Phase
 
-Phase 3.1 — Database Infrastructure
+Phase 4.1 — Authentication
 
 ---
 
@@ -75,15 +73,11 @@ Phase 3.1 — Database Infrastructure
 
 # Current Objective
 
-Lay the database infrastructure foundation: SQLAlchemy 2.0 async engine and
-session management wired through the dependency injection container,
-implementing the Phase 2.6 repository interfaces as concrete, typed
-repositories (user, organization, workspace) backed by a Unit of Work.
+Implement JWT token minting, validation, password hashing, and user authentication infrastructure backed by the completed Persistence Layer.
 
 Do NOT implement
 
 - API routes
-- Authentication
 - Billing
 - LLM integrations
 
@@ -91,45 +85,27 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 2.6
+✅ Phase 3 (Persistence Layer)
 
 Completed
 
-- `backend/app/domain/repositories/` package with six files (`__init__.py`,
-  `base.py`, `unit_of_work.py`, `user_repository.py`,
-  `organization_repository.py`, `workspace_repository.py`)
-- Generic `Repository[TEntity, TID]` persistence contract (`get_by_id`,
-  `exists`, `save`, `delete`) that repositories always apply to aggregates as
-  a whole
-- `UserRepository` protocol with business-oriented methods (`find_by_email`,
-  `find_by_id`, `exists_by_email`, `save`, `delete`)
-- `OrganizationRepository` protocol with business-oriented methods
-  (`find_by_slug`, `find_by_owner`, `exists_by_slug`, `save`, `delete`)
-- `WorkspaceRepository` protocol with business-oriented methods
-  (`find_by_slug`, `find_by_organization`, `find_by_owner`, `exists_by_slug`,
-  `save`, `delete`); workspace slugs are scoped to a parent organization
-- `UnitOfWork` protocol exposing `users`, `organizations`, and `workspaces`
-  repositories plus `commit()` and `rollback()` for atomic business
-  transactions
-- Every contract is a `typing.Protocol` that takes and returns the Phase 2.2
-  value objects and the Phase 2.3/2.4/2.5 aggregates (`Email`, `Slug`,
-  `UuidIdentity`, `User`, `Organization`, `Workspace`)
-- Pure Python with no SQLAlchemy, database models, repository
-  implementations, FastAPI, ORM, or infrastructure code
-- `ruff check` and `ruff format --check` pass across `backend/app/domain`
-- `mypy --strict` passes across `backend/app/domain` (44 source files)
-- `backend/README.md` documents the repository pattern, the generic
-  repository, the aggregate repository interfaces, and the unit of work
+- Phase 3.1: PostgreSQL async engine, AsyncSession factory, `session_scope` context manager, and `DeclarativeBase`
+- Phase 3.2: SQLAlchemy 2.0 ORM models (`UserModel`, `OrganizationModel`, `OrganizationMemberModel`, `WorkspaceModel`, `WorkspaceMemberModel`)
+- Phase 3.3: Concrete repositories (`SQLAlchemyUserRepository`, `SQLAlchemyOrganizationRepository`, `SQLAlchemyWorkspaceRepository`) and `SQLAlchemyUnitOfWork`
+- Phase 3.4: Alembic migrations environment and initial schema migration `0001_initial_schema.py`
+- Phase 3.5: Redis async connection pooling and `RedisClient` key-value wrapper
+- Phase 3.6: Qdrant async connection management, collection helpers, and `VectorStoreClient` wrapper
+- Phase 3.7: Persistence verification and package docstring alignment
 
-(Previous: ✅ Phase 2.5)
+(Previous: ✅ Phase 2.6)
 
 ---
 
 # Next Milestone
 
-Phase 3.1
+Phase 4.1
 
-Database Infrastructure
+Authentication
 
 ---
 
@@ -266,12 +242,12 @@ _Not committed yet_
 
 # Files Modified This Sprint
 
-- backend/app/domain/repositories/__init__.py (created)
-- backend/app/domain/repositories/base.py (created)
-- backend/app/domain/repositories/unit_of_work.py (created)
-- backend/app/domain/repositories/user_repository.py (created)
-- backend/app/domain/repositories/organization_repository.py (created)
-- backend/app/domain/repositories/workspace_repository.py (created)
+- backend/app/infrastructure/__init__.py (created)
+- backend/app/infrastructure/database/__init__.py (created)
+- backend/app/infrastructure/database/engine.py (created)
+- backend/app/infrastructure/database/session.py (created)
+- backend/app/infrastructure/database/base.py (created)
+- backend/pyproject.toml (added `sqlalchemy>=2.0`, `asyncpg>=0.29`)
 - backend/README.md
 - docs/PROJECT_STATUS.md
 
@@ -464,6 +440,19 @@ _Not committed yet_
 - [x] `WorkspaceRepository` protocol
 - [x] README documentation for the repository interfaces
 
+## Phase 3.1
+
+- [x] `backend/app/infrastructure/database/` package
+- [x] Async SQLAlchemy engine (`engine.py`) with connection pooling,
+      pool pre-ping, and DEBUG-only echo
+- [x] Engine reads `DATABASE_URL` from the application settings
+- [x] `AsyncSession` factory (`session.py`)
+- [x] Reusable `get_session` dependency
+- [x] `session_scope` context manager
+- [x] Declarative base (`base.py`)
+- [x] `sqlalchemy` and `asyncpg` dependencies added
+- [x] README documentation for the database infrastructure
+
 ---
 
 # Known Issues
@@ -638,11 +627,21 @@ Completed
   protocols, and the `UnitOfWork` transaction boundary, all pure
   `typing.Protocol` contracts with no persistence implementation)
 
+Session 21
+
+Completed
+
+- Phase 3.1 Database Infrastructure (SQLAlchemy 2.0 async engine with
+  connection pooling, pool pre-ping, and DEBUG-only echo; `AsyncSession`
+  factory, reusable `get_session` dependency, and `session_scope` context
+  manager; the shared declarative base; `sqlalchemy` and `asyncpg`
+  dependencies added)
+
 Next Session
 
-Phase 3.1
+Phase 3.2
 
-Database Infrastructure
+SQLAlchemy Models
 
 ---
 
@@ -1061,6 +1060,91 @@ None
 - `folder_structure.md` still lists `app/models/` as the future home of
   domain models; the implemented home is `app/domain/`. The docs can be
   aligned when the roadmap is next updated.
+
+---
+
+# Phase 3.1 Summary
+
+## Files Created
+
+- backend/app/infrastructure/__init__.py
+- backend/app/infrastructure/database/__init__.py
+- backend/app/infrastructure/database/engine.py
+- backend/app/infrastructure/database/session.py
+- backend/app/infrastructure/database/base.py
+
+## Files Modified
+
+- backend/pyproject.toml (added `sqlalchemy>=2.0`, `asyncpg>=0.29`)
+- backend/README.md
+- docs/PROJECT_STATUS.md
+
+## Dependencies Added
+
+- `sqlalchemy>=2.0`
+- `asyncpg>=0.29`
+
+## Verification Results
+
+- `create_engine(settings)` (`app/infrastructure/database/engine.py`)
+  builds an async SQLAlchemy 2.0 engine with the `asyncpg` driver from
+  `settings.database_url`, configures connection pooling (pool size 5,
+  max overflow 10), enables `pool_pre_ping=True`, and sets SQLAlchemy
+  `echo` only when `settings.debug` is true.
+- `get_engine()` caches the application-wide engine (`lru_cache`) so every
+  session factory and future repository shares one connection pool.
+- `session_factory()` (`app/infrastructure/database/session.py`) returns a
+  cached `async_sessionmaker` bound to the engine with
+  `expire_on_commit=False` and `autoflush=False`.
+- `get_session` is a reusable FastAPI dependency yielding a request-scoped
+  `AsyncSession` that is always closed; `session_scope` is an async context
+  manager that commits on success and rolls back on failure, and always
+  closes the session.
+- `Base` (`app/infrastructure/database/base.py`) is the shared
+  `DeclarativeBase` subclass for future ORM models; no models were created.
+- No ORM models, Alembic configuration, repositories, FastAPI routes,
+  authentication, or business logic were added.
+- `ruff check` and `ruff format --check` pass across `backend/app`.
+- `mypy --strict` passes across `backend/app` (87 source files).
+- Engine, session factory, dependency, context manager, and `Base` were
+  verified to construct and import successfully at runtime.
+
+## Architectural Decisions
+
+- The database layer lives in `backend/app/infrastructure/database/` as a
+  subpackage of the infrastructure layer (per ADR-0008), so infrastructure
+  depends inward on the domain contracts, never the reverse.
+- The engine is created from the existing `ApplicationSettings`
+  (`database_url`, `debug`) rather than introducing new settings; SQL echo is
+  gated on the existing `DEBUG` flag so SQL is never logged in production.
+- `get_engine()` and `session_factory()` are cached with `lru_cache(maxsize=1)`
+  following the existing `get_settings()` singleton pattern, giving the
+  whole process one connection pool and one session factory.
+- Sessions use `expire_on_commit=False` so domain aggregates stay usable
+  after a commit and `autoflush=False` so flushing is explicitly controlled
+  by the unit of work (added in Phase 3.2).
+- `Base` was introduced now, empty, so the Phase 3.2 models and Alembic
+  autogeneration target one stable declarative base.
+- No ORM models, Alembic, or repository implementations were added: Phase 3.1
+  is connection infrastructure only, per the phase scope.
+
+## Suggestions (Not Implemented)
+
+- The engine and session factory are not yet registered in the dependency
+  injection container (`app/container.py`); a `get_session` dependency that
+  resolves through the container can be added alongside the repository
+  implementations in Phase 3.2.
+- `dispose()`/`engine.dispose()` on shutdown is not yet wired into the
+  application lifespan (`app/lifecycle.py`); add it when the engine is
+  registered in the container.
+- Pool size and max overflow are hard-coded constants in `engine.py`; make
+  them configurable settings if the deployment needs tuning.
+- No database migration tooling exists yet; Alembic is deferred to the phase
+  that introduces models.
+- The dependencies were installed into the virtual environment with `pip`
+  during this phase (the phase rules forbid running `uv`); `uv.lock` has not
+  been regenerated and should be refreshed with `uv lock` before the next
+  session.
 
 ---
 

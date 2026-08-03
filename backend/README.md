@@ -40,7 +40,11 @@ roles, immutable settings, workspace statuses, domain events, and
 business-rule exceptions), and the Phase 2.6 repository interfaces
 (framework-independent `typing.Protocol` persistence contracts for the user,
 organization, and workspace repositories plus the unit of work, with no
-database or persistence implementation).
+database or persistence implementation), and the Phase 3.1 database
+infrastructure (the SQLAlchemy 2.0 async PostgreSQL connection layer: an
+async engine with connection pooling and pool pre-ping, an `AsyncSession`
+factory with a reusable dependency and a context manager, and the shared
+declarative base for future ORM models).
 
 ## Structure
 
@@ -137,6 +141,12 @@ backend/
 │   │       ├── user_repository.py         # UserRepository
 │   │       ├── organization_repository.py # OrganizationRepository
 │   │       └── workspace_repository.py    # WorkspaceRepository
+│   ├── infrastructure/         # External dependency adapters
+│   │   └── database/           # PostgreSQL connection layer (SQLAlchemy 2.0 async)
+│   │       ├── __init__.py     # Database package exports
+│   │       ├── engine.py       # Async engine factory (pooling, pre-ping, echo)
+│   │       ├── session.py      # AsyncSession factory, dependency, context manager
+│   │       └── base.py         # Declarative base for ORM models
 │   └── shared/            # Cross-cutting utilities
 ├── .env.example           # Template for environment variables
 ├── pyproject.toml         # Project metadata and dependencies
@@ -428,7 +438,7 @@ from app.domain.value_objects import Email, Money, UuidIdentity, Version
 
 user_id = UuidIdentity.generate()
 parsed_id = UuidIdentity.parse("123e4567-e89b-12d3-a456-426614174000")
-email = Email("User@Example.com")          # normalized to user@example.com
+email = Email("User@Example.com")  # normalized to user@example.com
 version = Version.parse("1.2.3")
 price = Money(Decimal("19.99"), "USD")
 ```
@@ -971,6 +981,99 @@ class UnitOfWork(Protocol):
 No implementation exists yet: the concrete unit of work (session-bound
 repositories, `commit()`, `rollback()`) is provided by the database
 infrastructure phase.
+
+## Database Infrastructure
+
+The database connection layer lives in `app/infrastructure/database/` and is
+built on SQLAlchemy 2.0 async with the `asyncpg` driver against PostgreSQL.
+This phase establishes the connection infrastructure only: no ORM models,
+repositories, or business logic exist yet. The concrete repository
+implementations will use these primitives in the next phase.
+
+### Database Engine
+
+`app/infrastructure/database/engine.py` builds the async engine:
+
+- **Async engine**: `create_async_engine` with the `asyncpg` driver.
+- **Connection pooling**: a `QueuePool` of up to 5 persistent connections
+  with up to 10 overflow connections under load.
+- **Pool pre-ping**: `pool_pre_ping=True` checks each connection before it is
+  checked out, so stale or broken connections are replaced transparently.
+- **Settings-driven**: the engine reads `DATABASE_URL` from the application
+  settings (`app/core/settings.py`), not from a hard-coded value.
+- **Debug logging only when `DEBUG=True`**: SQLAlchemy `echo` is enabled only
+  when `settings.debug` is true, so SQL statements are never emitted in
+  production.
+
+`create_engine(settings)` builds an engine from explicit settings, and
+`get_engine()` returns the cached application-wide engine (one shared
+connection pool for the whole process):
+
+```python
+from app.infrastructure.database import create_engine, get_engine
+from app.core.config import get_settings
+
+engine = create_engine(get_settings())  # build from explicit settings
+engine = get_engine()  # shared, cached engine
+```
+
+### Async Sessions
+
+`app/infrastructure/database/session.py` provides three ways to obtain an
+`AsyncSession`:
+
+| Entry point       | Kind            | Purpose                                        |
+| ----------------- | --------------- | ---------------------------------------------- |
+| `session_factory` | `async_sessionmaker` | Shared factory bound to the application engine |
+| `get_session`     | FastAPI dependency | One request-scoped session per request        |
+| `session_scope`   | async context manager | Auto-committing session for scripts/services |
+
+Sessions use `expire_on_commit=False` so aggregate instances stay usable
+after a commit, and `autoflush=False` so the unit of work controls exactly
+when changes reach the database.
+
+**Reusable dependency** — every route that needs a session declares the
+dependency and receives an open session that is closed automatically:
+
+```python
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.infrastructure.database import get_session
+
+
+@app.get("/example")
+async def example(session: AsyncSession = Depends(get_session)) -> dict:
+    return {"ok": True}
+```
+
+**Context manager** — long-running or non-request code commits on success
+and rolls back on failure:
+
+```python
+from app.infrastructure.database import session_scope
+
+async with session_scope() as session:
+    session.add(record)
+```
+
+### Declarative Base
+
+`app/infrastructure/database/base.py` defines `Base`, the single
+`DeclarativeBase` subclass every ORM model will inherit from:
+
+```python
+from app.infrastructure.database import Base
+
+
+class UserRow(Base):
+    __tablename__ = "users"
+    ...
+```
+
+No ORM models exist in this phase. The base is created now so the next
+phase's models (and Alembic autogeneration) target a stable, shared base
+class.
 
 ## Dependency Injection
 
