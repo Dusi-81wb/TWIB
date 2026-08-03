@@ -39,7 +39,7 @@ REST API            ████████████████████
 
 LLM Layer           ████████████████████ 100%
 
-Agents              ░░░░░░░░░░░░░░░░░░░░   0%
+Agents              ████████████████████ 100%
 
 Workflow Engine     ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -53,6 +53,7 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 > Authentication: Phase 4.1 through Phase 4.6 (Audit Logging) are complete.
 > REST API: Phase 5 (User Service, Organization Service, Workspace Service, Membership & Invitations, and Verification) is 100% complete.
 > LLM Layer: Phase 6 (Provider Abstraction, OpenAI Provider, Ollama Provider, Registry, Factory, Conversation, Streaming, and Verification) is 100% complete.
+> Agents: Phase 7 (Agent Core, Planner, Research, Analyst, Architect, Validator, Optimizer, Documentation, Supervisor, and Verification) is 100% complete.
 
 ---
 
@@ -64,7 +65,7 @@ Sprint 3
 
 # Current Phase
 
-Phase 7.1 — Agent Core
+Phase 8.1 — Workflow Engine Core
 
 ---
 
@@ -76,34 +77,50 @@ Phase 7.1 — Agent Core
 
 # Current Objective
 
-Build the core Agent framework, specifications, state, and execution loop.
+Implement the core Workflow Engine DAG execution and state management primitives.
 
 Do NOT implement
 
-- Workflow DAG engine
 - Frontend UI
 
 ---
 
 # Last Completed Milestone
 
-✅ Phase 6 (LLM Platform)
+✅ Phase 7 (Multi-Agent Framework)
+
+Agent Core & Specialized Agents
 
 Completed
 
-- Implemented abstract `LLMProvider` contract (`complete()`, `stream()`, `list_models()`, `health_check()`) in `app/infrastructure/llm/provider.py`
-- Implemented `OpenAIProvider` (`app/infrastructure/llm/providers/openai_provider.py`) backed by `openai.AsyncOpenAI` SDK
-- Implemented `OllamaProvider` (`app/infrastructure/llm/providers/ollama_provider.py`) backed by local Ollama REST API over `httpx`
-- Implemented `LLMProviderRegistry` & `LLMProviderFactory` (`app/infrastructure/llm/registry.py` and `factory.py`) with pre-registered `"openai"` and `"ollama"` providers
-- Implemented `Conversation` message state container (`app/infrastructure/llm/conversation.py`) and `AsyncStreamWrapper` (`app/infrastructure/llm/streaming.py`)
-- Registered `llm_provider_factory` in DI container (`app/container.py`) and FastAPI dependencies (`app/dependencies.py`)
-- Verified provider exception mapping, async streaming, cancellation, and alias module exports in `app.llm.*`
+- Implemented `BaseAgent` abstract base class with provider registry integration and metadata declaration
+- Implemented `PlannerAgent` for goal decomposition and `ExecutionPlan` generation
+- Implemented `ResearchAgent` for domain knowledge gathering and `ResearchReport` generation
+- Implemented `AnalystAgent` for requirement synthesis and `RequirementsAnalysis` generation
+- Implemented `ArchitectAgent` for modular system design and `ArchitectureDesign` generation
+- Implemented `ValidatorAgent` for quality assurance reviews and `ValidationReport` generation
+- Implemented `OptimizerAgent` for conciseness refinement and `OptimizationResult` generation
+- Implemented `DocumentationAgent` for Markdown guide creation and `DocumentationOutput` generation
+- Implemented `SupervisorAgent` for multi-agent pipeline orchestration, context propagation, and failure boundaries
+- Verified complete compatibility with Ruff, Mypy, and Pytest suite (24 tests passing)
 
-(Previous: ✅ Phase 5)
+(Previous: ✅ Phase 6)
 
 ---
 
 # Next Milestone
+
+Phase 8.1
+
+Workflow Engine Core
+
+---
+
+# Next Milestone
+
+Phase 7.10
+
+Agent Verification
 
 Phase 7.1
 
