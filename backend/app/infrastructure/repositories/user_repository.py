@@ -65,7 +65,7 @@ class SQLAlchemyUserRepository(
             metadata=Metadata(model.metadata_json),
             version=Version(model.version),
         )
-        user.clear_events()
+        user.pull_domain_events()
         return user
 
     def _to_model(self, entity: User, existing: UserModel | None = None) -> UserModel:
@@ -83,7 +83,7 @@ class SQLAlchemyUserRepository(
             existing.display_name = entity.display_name.value
             existing.status = entity.status.value
             existing.role = entity.role.value
-            existing.metadata_json = dict(entity.metadata.to_dict())
+            existing.metadata_json = dict(entity.metadata.value)
             existing.updated_at = entity.updated_at.value
             existing.version = entity.version.major
             return existing
@@ -96,7 +96,7 @@ class SQLAlchemyUserRepository(
             role=entity.role.value,
             created_at=entity.created_at.value,
             updated_at=entity.updated_at.value,
-            metadata_json=dict(entity.metadata.to_dict()),
+            metadata_json=dict(entity.metadata.value),
             version=entity.version.major,
         )
 

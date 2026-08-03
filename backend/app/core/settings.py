@@ -48,6 +48,9 @@ class ApplicationSettings(BaseSettings):
     api_prefix: str = API_PREFIX
     log_level: str = "INFO"
     secret_key: str = ""
+    jwt_secret_key: str = ""
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
     database_url: str = ""
     redis_url: str = ""
     qdrant_url: str = ""

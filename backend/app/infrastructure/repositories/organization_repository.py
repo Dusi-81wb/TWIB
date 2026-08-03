@@ -56,6 +56,17 @@ class SQLAlchemyOrganizationRepository(
         """
         super().__init__(session, OrganizationModel)
 
+    async def find_by_id(self, id_: UuidIdentity) -> Organization | None:
+        """Find an organization by identity.
+
+        Args:
+            id_: The identity of the organization to look up.
+
+        Returns:
+            The organization aggregate, or None if not found.
+        """
+        return await self.get_by_id(id_)
+
     def _to_domain(self, model: OrganizationModel) -> Organization:
         """Convert OrganizationModel into an Organization aggregate root.
 
@@ -89,7 +100,7 @@ class SQLAlchemyOrganizationRepository(
                 invitation_accepted=m.invitation_accepted,
             )
         org._members = members_dict
-        org.clear_events()
+        org.pull_domain_events()
         return org
 
     def _to_model(
@@ -110,7 +121,7 @@ class SQLAlchemyOrganizationRepository(
             existing.owner_id = entity.owner_id.value
             existing.status = entity.status.value
             existing.subscription_plan = entity.subscription_plan.value
-            existing.metadata_json = dict(entity.metadata.to_dict())
+            existing.metadata_json = dict(entity.metadata.value)
             existing.updated_at = entity.updated_at.value
             existing.version = entity.version.major
             target_model = existing
@@ -124,7 +135,7 @@ class SQLAlchemyOrganizationRepository(
                 subscription_plan=entity.subscription_plan.value,
                 created_at=entity.created_at.value,
                 updated_at=entity.updated_at.value,
-                metadata_json=dict(entity.metadata.to_dict()),
+                metadata_json=dict(entity.metadata.value),
                 version=entity.version.major,
             )
 

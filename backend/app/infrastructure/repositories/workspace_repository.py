@@ -56,6 +56,17 @@ class SQLAlchemyWorkspaceRepository(
         """
         super().__init__(session, WorkspaceModel)
 
+    async def find_by_id(self, id_: UuidIdentity) -> Workspace | None:
+        """Find a workspace by identity.
+
+        Args:
+            id_: The identity of the workspace to look up.
+
+        Returns:
+            The workspace aggregate, or None if not found.
+        """
+        return await self.get_by_id(id_)
+
     def _to_domain(self, model: WorkspaceModel) -> Workspace:
         """Convert a WorkspaceModel ORM instance into a Workspace domain aggregate root.
 
@@ -100,7 +111,7 @@ class SQLAlchemyWorkspaceRepository(
                 invitation_accepted=m.invitation_accepted,
             )
         ws._members = members_dict
-        ws.clear_events()
+        ws.pull_domain_events()
         return ws
 
     def _to_model(
@@ -133,7 +144,7 @@ class SQLAlchemyWorkspaceRepository(
             existing.description = entity.description.value
             existing.status = entity.status.value
             existing.settings_json = settings_dict
-            existing.metadata_json = dict(entity.metadata.to_dict())
+            existing.metadata_json = dict(entity.metadata.value)
             existing.updated_at = entity.updated_at.value
             existing.version = entity.version.major
             target_model = existing
@@ -149,7 +160,7 @@ class SQLAlchemyWorkspaceRepository(
                 settings_json=settings_dict,
                 created_at=entity.created_at.value,
                 updated_at=entity.updated_at.value,
-                metadata_json=dict(entity.metadata.to_dict()),
+                metadata_json=dict(entity.metadata.value),
                 version=entity.version.major,
             )
 

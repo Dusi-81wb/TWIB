@@ -8,7 +8,6 @@ session management, and abstract domain mapping hooks (:meth:`_to_domain` and
 
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -22,7 +21,7 @@ from app.infrastructure.database.models.base_model import BaseModel
 class BaseRepository[
     TEntity: Entity[Any],
     TModel: BaseModel,
-    TID: uuid.UUID | str | int,
+    TID: Any,
 ](ABC):
     """Abstract base repository for SQLAlchemy 2.0 async sessions.
 

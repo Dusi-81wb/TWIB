@@ -27,6 +27,17 @@ class OrganizationRepository(Protocol):
     unrestricted generic CRUD surface.
     """
 
+    async def find_by_id(self, id_: UuidIdentity) -> Organization | None:
+        """Find an organization by identity.
+
+        Args:
+            id_: The identity to look up.
+
+        Returns:
+            The organization aggregate, or None if not found.
+        """
+        ...
+
     async def find_by_slug(self, slug: Slug) -> Organization | None:
         """Find an organization by its URL-friendly slug.
 

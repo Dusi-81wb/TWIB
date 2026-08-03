@@ -8,15 +8,13 @@ health checking, and graceful shutdown.
 
 from __future__ import annotations
 
-from typing import Any
-
 from redis.asyncio import ConnectionPool, Redis
 
 from app.core.config import get_settings
 from app.core.settings import ApplicationSettings
 
 _pool: ConnectionPool | None = None
-_client_instance: Redis[Any] | None = None
+_client_instance: Redis | None = None
 
 
 def get_redis_pool(settings: ApplicationSettings | None = None) -> ConnectionPool:
@@ -43,7 +41,7 @@ def get_redis_pool(settings: ApplicationSettings | None = None) -> ConnectionPoo
     return _pool
 
 
-def get_redis_connection(settings: ApplicationSettings | None = None) -> Redis[Any]:
+def get_redis_connection(settings: ApplicationSettings | None = None) -> Redis:
     """Return the shared async Redis connection client.
 
     Creates and caches a ``Redis`` client instance bound to the shared
@@ -70,7 +68,7 @@ async def check_redis_health() -> bool:
     """
     try:
         client = get_redis_connection()
-        return await client.ping()  # type: ignore[no-any-return]
+        return bool(await client.ping())
     except Exception:
         return False
 

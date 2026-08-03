@@ -11,11 +11,14 @@ dependencies = [
     "fastapi>=0.115",
     "pydantic>=2.7",
     "pydantic-settings>=2.0",
+    "pwdlib[argon2]>=0.2",
+    "pyjwt>=2.8",
     "qdrant-client>=1.9",
     "redis>=5.0",
     "sqlalchemy>=2.0",
     "structlog>=24.1",
     "uvicorn>=0.30",
+    "email-validator>=2.3.0",
 ]
 
 [dependency-groups]

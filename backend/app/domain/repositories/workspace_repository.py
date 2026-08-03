@@ -28,6 +28,17 @@ class WorkspaceRepository(Protocol):
     parent organization, so slug lookups are organization-aware.
     """
 
+    async def find_by_id(self, id_: UuidIdentity) -> Workspace | None:
+        """Find a workspace by identity.
+
+        Args:
+            id_: The identity to look up.
+
+        Returns:
+            The workspace aggregate, or None if not found.
+        """
+        ...
+
     async def find_by_slug(
         self, organization_id: UuidIdentity, slug: Slug
     ) -> Workspace | None:

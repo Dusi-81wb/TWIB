@@ -10,7 +10,7 @@ provided by the database infrastructure phase.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.domain.repositories.organization_repository import OrganizationRepository
 from app.domain.repositories.user_repository import UserRepository
@@ -39,4 +39,21 @@ class UnitOfWork(Protocol):
 
     async def rollback(self) -> None:
         """Roll back the current transaction, discarding every change."""
+        ...
+
+    async def close(self) -> None:
+        """Close the underlying session resources."""
+        ...
+
+    async def __aenter__(self) -> UnitOfWork:
+        """Enter the async context manager."""
+        ...
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        """Exit the async context manager."""
         ...

@@ -15,6 +15,7 @@ registered here as additional providers.
 
 from dependency_injector import containers, providers
 
+from app.authorization.authorization_service import AuthorizationService
 from app.core.config import get_settings as _load_settings
 from app.core.logging import get_logger as _resolve_logger
 from app.infrastructure.cache import get_redis_client as _resolve_redis_client
@@ -27,6 +28,10 @@ from app.infrastructure.repositories import (
 from app.infrastructure.vector import (
     get_vector_store_client as _resolve_vector_store_client,
 )
+from app.security import JWTHelper, PasswordHasher
+from app.services.api_keys import ApiKeyService
+from app.services.audit import AuditService
+from app.services.auth import AuthenticationService, SessionService
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -44,6 +49,13 @@ class ApplicationContainer(containers.DeclarativeContainer):
         unit_of_work: Factory provider building Unit of Work instances.
         redis_client: Factory provider returning the RedisClient instance.
         vector_client: Factory provider returning the VectorStoreClient instance.
+        password_hasher: Singleton provider returning PasswordHasher.
+        jwt_helper: Factory provider returning JWTHelper.
+        session_service: Factory provider returning SessionService.
+        authentication_service: Factory provider returning AuthenticationService.
+        authorization_service: Factory provider returning AuthorizationService.
+        api_key_service: Singleton provider returning ApiKeyService.
+        audit_service: Singleton provider returning AuditService.
     """
 
     settings = providers.Singleton(_load_settings)
@@ -55,3 +67,26 @@ class ApplicationContainer(containers.DeclarativeContainer):
     unit_of_work = providers.Factory(SQLAlchemyUnitOfWork)
     redis_client = providers.Factory(_resolve_redis_client)
     vector_client = providers.Factory(_resolve_vector_store_client)
+    password_hasher = providers.Singleton(PasswordHasher)
+    jwt_helper = providers.Factory(JWTHelper, settings=settings)
+    session_service = providers.Factory(
+        SessionService,
+        redis_client=redis_client,
+        unit_of_work=unit_of_work,
+        jwt_helper=jwt_helper,
+        settings=settings,
+    )
+    authentication_service = providers.Factory(
+        AuthenticationService,
+        unit_of_work=unit_of_work,
+        password_hasher=password_hasher,
+        jwt_helper=jwt_helper,
+        settings=settings,
+        session_service=session_service,
+    )
+    authorization_service = providers.Factory(
+        AuthorizationService,
+        unit_of_work=unit_of_work,
+    )
+    api_key_service = providers.Singleton(ApiKeyService)
+    audit_service = providers.Singleton(AuditService)

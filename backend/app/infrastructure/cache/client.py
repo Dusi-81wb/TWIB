@@ -8,8 +8,6 @@ business-specific logic.
 
 from __future__ import annotations
 
-from typing import Any
-
 from redis.asyncio import Redis
 
 from app.infrastructure.cache.connection import get_redis_connection
@@ -22,7 +20,7 @@ class RedisClient:
         _redis: The underlying redis.asyncio.Redis instance.
     """
 
-    def __init__(self, redis_instance: Redis[Any] | None = None) -> None:
+    def __init__(self, redis_instance: Redis | None = None) -> None:
         """Initialize the Redis client wrapper.
 
         Args:
@@ -114,6 +112,18 @@ class RedisClient:
             True if the timeout was set, False if key does not exist.
         """
         return bool(await self._redis.expire(name=key, time=seconds))
+
+    async def keys(self, pattern: str = "*") -> list[str]:
+        """Find all keys matching the given pattern.
+
+        Args:
+            pattern: Glob-style key pattern.
+
+        Returns:
+            List of matching key strings.
+        """
+        raw_keys = await self._redis.keys(pattern)
+        return [k if isinstance(k, str) else k.decode("utf-8") for k in raw_keys]
 
     async def ping(self) -> bool:
         """Ping the Redis server to verify connectivity.

@@ -7,18 +7,24 @@ straightforward.
 """
 
 from collections.abc import AsyncIterator
-from typing import cast
+from typing import Any, cast
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import BoundLogger
 
+from app.authorization.authorization_service import AuthorizationService
 from app.container import ApplicationContainer
 from app.core.settings import ApplicationSettings
 from app.domain.repositories.unit_of_work import UnitOfWork
 from app.infrastructure.cache import RedisClient
 from app.infrastructure.database.session import get_session
 from app.infrastructure.vector import VectorStoreClient
+from app.security import JWTHelper, PasswordHasher
+from app.security.exceptions import InvalidTokenError, TokenExpiredError
+from app.services.api_keys import ApiKeyService
+from app.services.audit import AuditService
+from app.services.auth import AuthenticationService, SessionService
 
 
 def get_container(request: Request) -> ApplicationContainer:
@@ -100,3 +106,143 @@ def get_vector_store_client(request: Request) -> VectorStoreClient:
         The ``VectorStoreClient`` instance.
     """
     return get_container(request).vector_client()
+
+
+def get_password_hasher(request: Request) -> PasswordHasher:
+    """Resolve the PasswordHasher instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+
+    Returns:
+        The ``PasswordHasher`` singleton instance.
+    """
+    return get_container(request).password_hasher()
+
+
+def get_jwt_helper(request: Request) -> JWTHelper:
+    """Resolve the JWTHelper instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+
+    Returns:
+        The ``JWTHelper`` instance.
+    """
+    return get_container(request).jwt_helper()
+
+
+def get_session_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> SessionService:
+    """Resolve the SessionService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        A ``SessionService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.session_service(unit_of_work=uow)
+
+
+def get_authentication_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> AuthenticationService:
+    """Resolve the AuthenticationService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        An ``AuthenticationService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.authentication_service(unit_of_work=uow)
+
+
+def get_authorization_service(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> AuthorizationService:
+    """Resolve the AuthorizationService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+        uow: Request-scoped UnitOfWork dependency.
+
+    Returns:
+        An ``AuthorizationService`` instance bound to the request UnitOfWork.
+    """
+    container = get_container(request)
+    return container.authorization_service(unit_of_work=uow)
+
+
+def get_api_key_service(request: Request) -> ApiKeyService:
+    """Resolve the ApiKeyService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+
+    Returns:
+        The ``ApiKeyService`` singleton instance.
+    """
+    return get_container(request).api_key_service()
+
+
+def get_audit_service(request: Request) -> AuditService:
+    """Resolve the AuditService instance from the DI container.
+
+    Args:
+        request: The active FastAPI request.
+
+    Returns:
+        The ``AuditService`` singleton instance.
+    """
+    return get_container(request).audit_service()
+
+
+def get_current_user_claims(
+    request: Request,
+    jwt_helper: JWTHelper = Depends(get_jwt_helper),
+) -> dict[str, Any]:
+    """Decode and extract authenticated user claims from Authorization header.
+
+    Args:
+        request: The active FastAPI request.
+        jwt_helper: Injected JWTHelper dependency.
+
+    Returns:
+        Dictionary of token claims containing sub (user_id), email, role, etc.
+
+    Raises:
+        HTTPException: 401 Unauthorized if header or token is invalid.
+    """
+    auth_header = request.headers.get("authorization")
+    if not auth_header or not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = auth_header.split(" ", 1)[1].strip()
+    try:
+        return jwt_helper.decode_token(token)
+    except (InvalidTokenError, TokenExpiredError) as err:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(err),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from err
+
+
+
+
+
+

@@ -8,7 +8,8 @@ domain-specific or LLM/RAG logic.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import PointStruct
@@ -156,7 +157,7 @@ class VectorStoreClient:
         """
         try:
             return list(
-                await self._qdrant.search(
+                await self._qdrant.search(  # type: ignore[attr-defined]
                     collection_name=collection_name,
                     query_vector=query_vector,
                     limit=limit,
@@ -194,7 +195,7 @@ class VectorStoreClient:
     async def delete_points(
         self,
         collection_name: str,
-        point_ids: list[str | int],
+        point_ids: Sequence[str | int],
     ) -> bool:
         """Delete points by ID from a collection.
 
@@ -211,7 +212,7 @@ class VectorStoreClient:
         try:
             await self._qdrant.delete(
                 collection_name=collection_name,
-                points_selector=point_ids,
+                points_selector=cast(Any, list(point_ids)),
             )
             return True
         except Exception:
