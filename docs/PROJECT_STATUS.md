@@ -41,7 +41,7 @@ LLM Layer           ████████████████████
 
 Agents              ████████████████████ 100%
 
-Workflow Engine     ░░░░░░░░░░░░░░░░░░░░   0%
+Workflow Engine     ████████████████████ 100%
 
 Frontend            ░░░░░░░░░░░░░░░░░░░░   0%
 
@@ -54,6 +54,7 @@ Deployment          ░░░░░░░░░░░░░░░░░░░░
 > REST API: Phase 5 (User Service, Organization Service, Workspace Service, Membership & Invitations, and Verification) is 100% complete.
 > LLM Layer: Phase 6 (Provider Abstraction, OpenAI Provider, Ollama Provider, Registry, Factory, Conversation, Streaming, and Verification) is 100% complete.
 > Agents: Phase 7 (Agent Core, Planner, Research, Analyst, Architect, Validator, Optimizer, Documentation, Supervisor, and Verification) is 100% complete.
+> Workflow Engine: Phase 8 (Workflow Engine Core, Workflow Executor, Workflow State Management, Human Approval & Checkpoints, Workflow Templates, and Verification) is 100% complete.
 
 ---
 
@@ -65,7 +66,7 @@ Sprint 3
 
 # Current Phase
 
-Phase 8.1 — Workflow Engine Core
+Phase 9.1 — API & Realtime
 
 ---
 
@@ -77,7 +78,7 @@ Phase 8.1 — Workflow Engine Core
 
 # Current Objective
 
-Implement the core Workflow Engine DAG execution and state management primitives.
+Implement Phase 9.1 API & Realtime endpoints for workflow orchestration.
 
 Do NOT implement
 
@@ -87,32 +88,69 @@ Do NOT implement
 
 # Last Completed Milestone
 
-✅ Phase 7 (Multi-Agent Framework)
+✅ Phase 8 (Workflow Engine Framework)
 
-Agent Core & Specialized Agents
+Workflow Engine Core, Executor, State Management, Human Approval & Templates
 
 Completed
 
-- Implemented `BaseAgent` abstract base class with provider registry integration and metadata declaration
-- Implemented `PlannerAgent` for goal decomposition and `ExecutionPlan` generation
-- Implemented `ResearchAgent` for domain knowledge gathering and `ResearchReport` generation
-- Implemented `AnalystAgent` for requirement synthesis and `RequirementsAnalysis` generation
-- Implemented `ArchitectAgent` for modular system design and `ArchitectureDesign` generation
-- Implemented `ValidatorAgent` for quality assurance reviews and `ValidationReport` generation
-- Implemented `OptimizerAgent` for conciseness refinement and `OptimizationResult` generation
-- Implemented `DocumentationAgent` for Markdown guide creation and `DocumentationOutput` generation
-- Implemented `SupervisorAgent` for multi-agent pipeline orchestration, context propagation, and failure boundaries
-- Verified complete compatibility with Ruff, Mypy, and Pytest suite (24 tests passing)
+- Implemented `WorkflowEngine` core in `app/workflows/workflow_engine.py`
+- Implemented `WorkflowExecutor` in `app/workflows/workflow_executor.py` delegating to `SupervisorAgent`
+- Implemented `WorkflowStateManager` and transition validation in `app/workflows/workflow_state.py` and `app/workflows/workflow_state_manager.py`
+- Implemented `ApprovalManager` and `WorkflowCheckpoint` in `app/workflows/workflow_checkpoint.py` and `app/workflows/approval_manager.py`
+- Implemented `WorkflowTemplateService` and built-in templates in `app/workflows/workflow_template.py`, `app/workflows/workflow_template_models.py`, and `app/workflows/workflow_template_service.py`
+- Reused existing architecture, RBAC authorization, and Audit Logging
+- Verified complete compatibility with Ruff, Mypy, and Pytest suite (42 passing tests)
 
-(Previous: ✅ Phase 6)
+(Previous: ✅ Phase 7)
 
 ---
 
 # Next Milestone
 
-Phase 8.1
+Phase 9.1
 
-Workflow Engine Core
+API & Realtime
+
+---
+
+# Next Milestone
+
+Phase 8.6
+
+Workflow Verification
+
+---
+
+# Next Milestone
+
+Phase 8.5
+
+Workflow Templates
+
+---
+
+# Next Milestone
+
+Phase 8.4
+
+Human Approval & Checkpoints
+
+---
+
+# Next Milestone
+
+Phase 8.3
+
+Workflow State Management
+
+---
+
+# Next Milestone
+
+Phase 8.2
+
+Workflow Executor
 
 ---
 
