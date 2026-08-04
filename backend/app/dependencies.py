@@ -328,3 +328,83 @@ def get_llm_provider_factory(
     """
     container = get_container(request)
     return container.llm_provider_factory()
+
+
+def get_workflow_engine(request: Request) -> Any:
+    """Resolve WorkflowEngine instance from the DI container."""
+    return get_container(request).workflow_engine()
+
+
+def get_workflow_executor(request: Request) -> Any:
+    """Resolve WorkflowExecutor instance from the DI container."""
+    return get_container(request).workflow_executor()
+
+
+def get_workflow_state_manager(request: Request) -> Any:
+    """Resolve WorkflowStateManager instance from the DI container."""
+    return get_container(request).workflow_state_manager()
+
+
+def get_workflow_template_service(request: Request) -> Any:
+    """Resolve WorkflowTemplateService instance from the DI container."""
+    return get_container(request).workflow_template_service()
+
+
+def get_approval_manager(request: Request) -> Any:
+    """Resolve ApprovalManager instance from the DI container."""
+    return get_container(request).approval_manager()
+
+
+def get_planner_agent(request: Request) -> Any:
+    """Resolve PlannerAgent instance from the DI container."""
+    return get_container(request).planner_agent()
+
+
+def get_research_agent(request: Request) -> Any:
+    """Resolve ResearchAgent instance from the DI container."""
+    return get_container(request).research_agent()
+
+
+def get_analyst_agent(request: Request) -> Any:
+    """Resolve AnalystAgent instance from the DI container."""
+    return get_container(request).analyst_agent()
+
+
+def get_architect_agent(request: Request) -> Any:
+    """Resolve ArchitectAgent instance from the DI container."""
+    return get_container(request).architect_agent()
+
+
+def get_validator_agent(request: Request) -> Any:
+    """Resolve ValidatorAgent instance from the DI container."""
+    return get_container(request).validator_agent()
+
+
+def get_optimizer_agent(request: Request) -> Any:
+    """Resolve OptimizerAgent instance from the DI container."""
+    return get_container(request).optimizer_agent()
+
+
+def get_documentation_agent(request: Request) -> Any:
+    """Resolve DocumentationAgent instance from the DI container."""
+    return get_container(request).documentation_agent()
+
+
+def get_supervisor_agent(request: Request) -> Any:
+    """Resolve SupervisorAgent instance from the DI container."""
+    return get_container(request).supervisor_agent()
+
+
+def get_websocket_manager(request: Request) -> Any:
+    """Resolve WebSocketManager instance from the DI container."""
+    return get_container(request).websocket_manager()
+
+
+def get_workflow_event_publisher(request: Request) -> Any:
+    """Resolve WorkflowEventPublisher instance from the DI container."""
+    return get_container(request).workflow_event_publisher()
+
+
+def get_monitoring_service(request: Request) -> Any:
+    """Resolve MonitoringService instance from the DI container."""
+    return get_container(request).monitoring_service()

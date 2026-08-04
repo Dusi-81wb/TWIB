@@ -16,7 +16,20 @@ from fastapi import Depends, HTTPException, Request, status
 
 from app.authorization.authorization_service import AuthorizationService
 from app.authorization.roles import UserRole, WorkspaceRole
-from app.dependencies import get_authorization_service, get_current_user_claims
+
+
+def _deps_get_current_user_claims(request: Request) -> dict[str, Any]:
+    """Lazy wrapper for get_current_user_claims to avoid circular imports."""
+    from app.dependencies import get_current_user_claims
+
+    return get_current_user_claims(request)
+
+
+def _deps_get_authorization_service(request: Request) -> AuthorizationService:
+    """Lazy wrapper for get_authorization_service to avoid circular imports."""
+    from app.dependencies import get_authorization_service
+
+    return get_authorization_service(request)
 
 
 class RequirePermission:
@@ -33,8 +46,8 @@ class RequirePermission:
     async def __call__(
         self,
         request: Request,
-        claims: dict[str, Any] = Depends(get_current_user_claims),
-        authz_service: AuthorizationService = Depends(get_authorization_service),
+        claims: dict[str, Any] = Depends(_deps_get_current_user_claims),
+        authz_service: AuthorizationService = Depends(_deps_get_authorization_service),
     ) -> dict[str, Any]:
         """Evaluate permission requirement against active request and user.
 
@@ -93,8 +106,8 @@ class RequireOrganizationRole:
     async def __call__(
         self,
         request: Request,
-        claims: dict[str, Any] = Depends(get_current_user_claims),
-        authz_service: AuthorizationService = Depends(get_authorization_service),
+        claims: dict[str, Any] = Depends(_deps_get_current_user_claims),
+        authz_service: AuthorizationService = Depends(_deps_get_authorization_service),
     ) -> dict[str, Any]:
         """Evaluate organization role requirement.
 
@@ -157,8 +170,8 @@ class RequireWorkspaceRole:
     async def __call__(
         self,
         request: Request,
-        claims: dict[str, Any] = Depends(get_current_user_claims),
-        authz_service: AuthorizationService = Depends(get_authorization_service),
+        claims: dict[str, Any] = Depends(_deps_get_current_user_claims),
+        authz_service: AuthorizationService = Depends(_deps_get_authorization_service),
     ) -> dict[str, Any]:
         """Evaluate workspace role requirement.
 

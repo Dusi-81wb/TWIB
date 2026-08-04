@@ -7,7 +7,7 @@ constructed and configured in a controlled and testable way.
 
 from fastapi import FastAPI
 
-from app.api.openapi import CONTACT, DESCRIPTION, LICENSE, OPENAPI_TAGS
+from app.api.openapi import CONTACT, DESCRIPTION, LICENSE, OPENAPI_TAGS, setup_openapi
 from app.api.router import api_router
 from app.container import ApplicationContainer
 from app.core.constants import SERVICE_NAME, VERSION
@@ -46,6 +46,7 @@ def create_application() -> FastAPI:
     application.state.container = container
     application.state.settings = settings
 
+    setup_openapi(application)
     register_exception_handlers(application)
     register_middlewares(application, settings)
     application.include_router(api_router)

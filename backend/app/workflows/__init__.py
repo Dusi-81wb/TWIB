@@ -1,6 +1,7 @@
 """Workflow Engine core package."""
 
 from app.workflows.approval_manager import ApprovalManager
+from app.workflows.websocket_manager import WebSocketManager
 from app.workflows.workflow import Workflow
 from app.workflows.workflow_checkpoint import (
     ApprovalStatus,
@@ -8,6 +9,11 @@ from app.workflows.workflow_checkpoint import (
     WorkflowCheckpoint,
 )
 from app.workflows.workflow_engine import WorkflowEngine
+from app.workflows.workflow_events import (
+    WorkflowEvent,
+    WorkflowEventPublisher,
+    WorkflowEventType,
+)
 from app.workflows.workflow_exceptions import (
     WorkflowError,
     WorkflowExecutionError,
@@ -43,11 +49,15 @@ __all__ = [
     "CheckpointType",
     "StateHistoryEntry",
     "TemplateCategory",
+    "WebSocketManager",
     "Workflow",
     "WorkflowCheckpoint",
     "WorkflowData",
     "WorkflowEngine",
     "WorkflowError",
+    "WorkflowEvent",
+    "WorkflowEventPublisher",
+    "WorkflowEventType",
     "WorkflowExecutionError",
     "WorkflowExecutor",
     "WorkflowNotFoundError",

@@ -15,6 +15,16 @@ registered here as additional providers.
 
 from dependency_injector import containers, providers
 
+from app.agents import (
+    AnalystAgent,
+    ArchitectAgent,
+    DocumentationAgent,
+    OptimizerAgent,
+    PlannerAgent,
+    ResearchAgent,
+    SupervisorAgent,
+    ValidatorAgent,
+)
 from app.authorization.authorization_service import AuthorizationService
 from app.core.config import get_settings as _load_settings
 from app.core.logging import get_logger as _resolve_logger
@@ -34,9 +44,20 @@ from app.services.api_keys import ApiKeyService
 from app.services.audit import AuditService
 from app.services.auth import AuthenticationService, SessionService
 from app.services.invitations import InvitationService
+from app.services.monitoring_service import MonitoringService
 from app.services.organizations import OrganizationService
 from app.services.users import UserService
 from app.services.workspaces import WorkspaceService
+from app.workflows import (
+    ApprovalManager,
+    WebSocketManager,
+    WorkflowEngine,
+    WorkflowEventPublisher,
+    WorkflowExecutor,
+    WorkflowStateManager,
+    WorkflowTemplateService,
+)
+from app.workflows.workflow_monitor import WorkflowMonitor
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -44,24 +65,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     The container is created and initialized by the application factory
     and exposed to every component through ``app.state.container``.
-
-    Attributes:
-        settings: Singleton provider resolving the application settings.
-        logger: Factory provider building named structured loggers.
-        user_repository: Factory provider building User repositories.
-        organization_repository: Factory provider building Organization repositories.
-        workspace_repository: Factory provider building Workspace repositories.
-        unit_of_work: Factory provider building Unit of Work instances.
-        redis_client: Factory provider returning the RedisClient instance.
-        vector_client: Factory provider returning the VectorStoreClient instance.
-        password_hasher: Singleton provider returning PasswordHasher.
-        jwt_helper: Factory provider returning JWTHelper.
-        session_service: Factory provider returning SessionService.
-        authentication_service: Factory provider returning AuthenticationService.
-        authorization_service: Factory provider returning AuthorizationService.
-        api_key_service: Singleton provider returning ApiKeyService.
-        audit_service: Singleton provider returning AuditService.
-        user_service: Factory provider returning UserService.
     """
 
     settings = providers.Singleton(_load_settings)
@@ -116,4 +119,68 @@ class ApplicationContainer(containers.DeclarativeContainer):
     llm_provider_factory = providers.Singleton(
         LLMProviderFactory,
         settings=settings,
+    )
+    planner_agent = providers.Factory(
+        PlannerAgent,
+        llm_factory=llm_provider_factory,
+    )
+    research_agent = providers.Factory(
+        ResearchAgent,
+        llm_factory=llm_provider_factory,
+    )
+    analyst_agent = providers.Factory(
+        AnalystAgent,
+        llm_factory=llm_provider_factory,
+    )
+    architect_agent = providers.Factory(
+        ArchitectAgent,
+        llm_factory=llm_provider_factory,
+    )
+    validator_agent = providers.Factory(
+        ValidatorAgent,
+        llm_factory=llm_provider_factory,
+    )
+    optimizer_agent = providers.Factory(
+        OptimizerAgent,
+        llm_factory=llm_provider_factory,
+    )
+    documentation_agent = providers.Factory(
+        DocumentationAgent,
+        llm_factory=llm_provider_factory,
+    )
+    supervisor_agent = providers.Factory(
+        SupervisorAgent,
+        llm_factory=llm_provider_factory,
+    )
+    workflow_event_publisher = providers.Singleton(WorkflowEventPublisher)
+    websocket_manager = providers.Singleton(WebSocketManager)
+    workflow_engine = providers.Singleton(WorkflowEngine)
+    workflow_executor = providers.Singleton(
+        WorkflowExecutor,
+        engine=workflow_engine,
+    )
+    workflow_state_manager = providers.Singleton(
+        WorkflowStateManager,
+        uow=unit_of_work,
+    )
+    workflow_template_service = providers.Singleton(
+        WorkflowTemplateService,
+        engine=workflow_engine,
+        audit_service=audit_service,
+    )
+    workflow_monitor = providers.Factory(
+        WorkflowMonitor,
+        engine=workflow_engine,
+    )
+    monitoring_service = providers.Factory(
+        MonitoringService,
+        engine=workflow_engine,
+        llm_factory=llm_provider_factory,
+        monitor=workflow_monitor,
+    )
+    approval_manager = providers.Singleton(
+        ApprovalManager,
+        engine=workflow_engine,
+        state_manager=workflow_state_manager,
+        audit_service=audit_service,
     )
