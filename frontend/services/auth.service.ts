@@ -1,6 +1,5 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, unpackResponse } from "@/lib/api-client";
 import { AuthTokens, User } from "@/types/auth.types";
-import { ApiResponse } from "@/types/api.types";
 import { useAuthStore } from "@/stores/use-auth-store";
 
 export interface LoginPayload {
@@ -27,12 +26,12 @@ export interface LoginResponseData {
 
 export const authService = {
   async login(payload: LoginPayload): Promise<{ user: User | null; tokens: AuthTokens }> {
-    const res = await apiClient.post<ApiResponse<LoginResponseData>>("/auth/login", {
+    const res = await apiClient.post("/auth/login", {
       email: payload.email,
       password: payload.password,
     });
 
-    const data = res.data?.data || (res.data as unknown as LoginResponseData);
+    const data = unpackResponse<LoginResponseData>(res.data);
     const tokens: AuthTokens = {
       access_token: data?.tokens?.access_token || data?.access_token || "",
       refresh_token: data?.tokens?.refresh_token || data?.refresh_token || "",
@@ -43,10 +42,10 @@ export const authService = {
     let user: User | null = data?.user || null;
     if (!user && tokens.access_token) {
       try {
-        const meRes = await apiClient.get<ApiResponse<User>>("/users/me", {
+        const meRes = await apiClient.get("/users/me", {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
-        user = meRes.data?.data || null;
+        user = unpackResponse<User>(meRes.data);
       } catch {
         user = {
           id: "usr-temp",
@@ -76,14 +75,14 @@ export const authService = {
     const nameVal = payload.name || payload.display_name || "";
     const displayNameVal = payload.display_name || payload.name || "";
 
-    const res = await apiClient.post<ApiResponse<LoginResponseData>>("/auth/register", {
+    const res = await apiClient.post("/auth/register", {
       email: payload.email,
       password: payload.password,
       name: nameVal,
       display_name: displayNameVal,
     });
 
-    const data = res.data?.data || (res.data as unknown as LoginResponseData);
+    const data = unpackResponse<LoginResponseData>(res.data);
     const tokens: AuthTokens = {
       access_token: data?.tokens?.access_token || data?.access_token || "",
       refresh_token: data?.tokens?.refresh_token || data?.refresh_token || "",
@@ -94,10 +93,10 @@ export const authService = {
     let user: User | null = data?.user || null;
     if (!user && tokens.access_token) {
       try {
-        const meRes = await apiClient.get<ApiResponse<User>>("/users/me", {
+        const meRes = await apiClient.get("/users/me", {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
-        user = meRes.data?.data || null;
+        user = unpackResponse<User>(meRes.data);
       } catch {
         user = {
           id: "usr-temp",
@@ -136,20 +135,23 @@ export const authService = {
   },
 
   async getCurrentUser(): Promise<User> {
-    const res = await apiClient.get<ApiResponse<User>>("/users/me");
-    return res.data.data!;
+    const res = await apiClient.get("/users/me");
+    return unpackResponse<User>(res.data);
   },
 
   async getPermissions(): Promise<string[]> {
-    const res = await apiClient.get<ApiResponse<string[]>>("/auth/permissions");
-    return res.data.data!;
+    const res = await apiClient.get("/auth/permissions");
+    const unpacked = unpackResponse<any>(res.data);
+    if (Array.isArray(unpacked)) return unpacked;
+    if (unpacked && Array.isArray(unpacked.permissions)) return unpacked.permissions;
+    return [];
   },
 
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>("/auth/refresh", {
+    const res = await apiClient.post("/auth/refresh", {
       refresh_token: refreshToken,
     });
-    return res.data.data!;
+    return unpackResponse<AuthTokens>(res.data);
   },
 
   async requestPasswordReset(email: string): Promise<void> {

@@ -1,31 +1,49 @@
-import { apiClient } from "@/lib/api-client";
-import { ApiResponse, PaginatedResponse } from "@/types/api.types";
+import { apiClient, unpackResponse, unpackPaginatedResponse } from "@/lib/api-client";
+import { PaginatedResponse } from "@/types/api.types";
 
 export const apiService = {
   async get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-    const res = await apiClient.get<ApiResponse<T>>(url, { params });
-    return (res.data.data !== undefined ? res.data.data : res.data) as T;
+    const res = await apiClient.get(url, { params });
+    return unpackResponse<T>(res.data);
   },
 
   async post<T>(url: string, body?: unknown): Promise<T> {
-    const res = await apiClient.post<ApiResponse<T>>(url, body);
-    return (res.data.data !== undefined ? res.data.data : res.data) as T;
+    const res = await apiClient.post(url, body);
+    return unpackResponse<T>(res.data);
   },
 
   async put<T>(url: string, body?: unknown): Promise<T> {
-    const res = await apiClient.put<ApiResponse<T>>(url, body);
-    return (res.data.data !== undefined ? res.data.data : res.data) as T;
+    const res = await apiClient.put(url, body);
+    return unpackResponse<T>(res.data);
+  },
+
+  async patch<T>(url: string, body?: unknown): Promise<T> {
+    const res = await apiClient.patch(url, body);
+    return unpackResponse<T>(res.data);
   },
 
   async delete<T>(url: string): Promise<T> {
-    const res = await apiClient.delete<ApiResponse<T>>(url);
-    return (res.data.data !== undefined ? res.data.data : res.data) as T;
+    const res = await apiClient.delete(url);
+    return unpackResponse<T>(res.data);
   },
 
   async getPaginated<T>(url: string, page = 1, size = 20): Promise<PaginatedResponse<T>> {
-    const res = await apiClient.get<ApiResponse<PaginatedResponse<T>>>(url, {
-      params: { page, size },
+    const limit = size;
+    const offset = (page - 1) * size;
+    const res = await apiClient.get(url, {
+      params: { limit, offset, page, size },
     });
-    return res.data.data!;
+    const unpacked = unpackPaginatedResponse<T>(res.data);
+    const total = unpacked.total;
+    const pages = Math.ceil(total / (size || 1)) || 1;
+    return {
+      items: unpacked.items,
+      meta: {
+        total,
+        page,
+        size,
+        pages,
+      },
+    };
   },
 };

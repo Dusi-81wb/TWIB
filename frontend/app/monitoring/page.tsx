@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
-import { ApiResponse } from "@/types/api.types";
+import { apiClient, unpackResponse } from "@/lib/api-client";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -11,23 +10,21 @@ import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Activity, Cpu, Database, Server, ShieldCheck, GitBranch } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 export default function MonitoringPage() {
   const { data: health } = useQuery({
     queryKey: ["monitoring-health"],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<any>>("/monitoring/health");
-      return res.data.data;
+      const res = await apiClient.get("/monitoring/health");
+      return unpackResponse<any>(res.data);
     },
   });
 
   const { data: metrics } = useQuery({
     queryKey: ["monitoring-metrics"],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<any>>("/monitoring/workflows");
-      return res.data.data;
+      const res = await apiClient.get("/monitoring/workflows");
+      return unpackResponse<any>(res.data);
     },
   });
 

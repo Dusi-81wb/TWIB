@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { orgService, WorkspaceItem } from "@/services/org.service";
+import { orgService } from "@/services/org.service";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -21,6 +21,11 @@ export default function WorkspacesPage() {
     queryFn: () => orgService.getWorkspaces(),
   });
 
+  const { data: orgs = [] } = useQuery({
+    queryKey: ["organizations-list"],
+    queryFn: () => orgService.getOrganizations(),
+  });
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -34,8 +39,9 @@ export default function WorkspacesPage() {
     if (!name.trim()) return;
     setIsCreating(true);
     try {
+      const targetOrgId = orgs[0]?.id || "00000000-0000-0000-0000-000000000001";
       await orgService.createWorkspace({
-        organization_id: "org-ai-lab",
+        organization_id: targetOrgId,
         name,
         description: desc,
       });

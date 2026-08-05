@@ -1,13 +1,16 @@
-import { apiClient } from "@/lib/api-client";
-import { ApiResponse } from "@/types/api.types";
+import { apiClient, unpackResponse, unpackPaginatedResponse } from "@/lib/api-client";
 
 export interface OrganizationItem {
   id: string;
   name: string;
   slug: string;
   description?: string;
+  owner_id?: string;
+  status?: string;
+  subscription_plan?: string;
   member_count?: number;
   workspace_count?: number;
+  members?: OrgMemberItem[];
   created_at: string;
   updated_at?: string;
 }
@@ -18,47 +21,57 @@ export interface WorkspaceItem {
   name: string;
   slug: string;
   description?: string;
+  owner_id?: string;
+  status?: string;
   member_count?: number;
   workflow_count?: number;
+  members?: OrgMemberItem[];
   created_at: string;
   updated_at?: string;
 }
 
 export interface OrgMemberItem {
-  id: string;
+  id?: string;
   user_id: string;
-  name: string;
-  email: string;
-  role: "owner" | "admin" | "member" | "viewer";
-  status: "active" | "invited" | "suspended";
+  name?: string;
+  email?: string;
+  role: "owner" | "admin" | "member" | "viewer" | string;
+  status: "active" | "invited" | "suspended" | string;
   joined_at: string;
 }
 
 export interface CreateOrgPayload {
   name: string;
+  slug?: string;
   description?: string;
 }
 
 export interface CreateWorkspacePayload {
   organization_id: string;
   name: string;
+  slug?: string;
   description?: string;
 }
 
 export interface InviteMemberPayload {
   email: string;
-  role: "admin" | "member" | "viewer";
+  role: "admin" | "member" | "viewer" | string;
 }
 
 export const orgService = {
   async getOrganizations(): Promise<OrganizationItem[]> {
     try {
-      const res = await apiClient.get<ApiResponse<OrganizationItem[]>>("/organizations");
-      if (res.data.data && res.data.data.length > 0) {
-        return res.data.data;
+      const res = await apiClient.get("/organizations");
+      const { items } = unpackPaginatedResponse<OrganizationItem>(res.data);
+      if (items && items.length > 0) {
+        return items.map((org) => ({
+          ...org,
+          member_count: org.member_count ?? org.members?.length ?? 1,
+          workspace_count: org.workspace_count ?? 1,
+        }));
       }
     } catch {
-      // Endpoint fallback
+      // Fallback if backend service is unreachable
     }
 
     return [
@@ -85,8 +98,15 @@ export const orgService = {
 
   async getOrganization(orgId: string): Promise<OrganizationItem> {
     try {
-      const res = await apiClient.get<ApiResponse<OrganizationItem>>(`/organizations/${orgId}`);
-      if (res.data.data) return res.data.data;
+      const res = await apiClient.get(`/organizations/${orgId}`);
+      const org = unpackResponse<OrganizationItem>(res.data);
+      if (org && org.id) {
+        return {
+          ...org,
+          member_count: org.member_count ?? org.members?.length ?? 1,
+          workspace_count: org.workspace_count ?? 1,
+        };
+      }
     } catch {
       // Fallback
     }
@@ -103,8 +123,8 @@ export const orgService = {
   },
 
   async createOrganization(payload: CreateOrgPayload): Promise<OrganizationItem> {
-    const res = await apiClient.post<ApiResponse<OrganizationItem>>("/organizations", payload);
-    return res.data.data!;
+    const res = await apiClient.post("/organizations", payload);
+    return unpackResponse<OrganizationItem>(res.data);
   },
 
   async deleteOrganization(orgId: string): Promise<void> {
@@ -113,10 +133,15 @@ export const orgService = {
 
   async getWorkspaces(orgId?: string): Promise<WorkspaceItem[]> {
     try {
-      const url = orgId ? `/organizations/${orgId}/workspaces` : "/workspaces";
-      const res = await apiClient.get<ApiResponse<WorkspaceItem[]>>(url);
-      if (res.data.data && res.data.data.length > 0) {
-        return res.data.data;
+      const url = orgId ? `/workspaces?organization_id=${orgId}` : "/workspaces";
+      const res = await apiClient.get(url);
+      const { items } = unpackPaginatedResponse<WorkspaceItem>(res.data);
+      if (items && items.length > 0) {
+        return items.map((ws) => ({
+          ...ws,
+          member_count: ws.member_count ?? ws.members?.length ?? 1,
+          workflow_count: ws.workflow_count ?? 2,
+        }));
       }
     } catch {
       // Fallback
@@ -158,8 +183,15 @@ export const orgService = {
 
   async getWorkspace(wsId: string): Promise<WorkspaceItem> {
     try {
-      const res = await apiClient.get<ApiResponse<WorkspaceItem>>(`/workspaces/${wsId}`);
-      if (res.data.data) return res.data.data;
+      const res = await apiClient.get(`/workspaces/${wsId}`);
+      const ws = unpackResponse<WorkspaceItem>(res.data);
+      if (ws && ws.id) {
+        return {
+          ...ws,
+          member_count: ws.member_count ?? ws.members?.length ?? 1,
+          workflow_count: ws.workflow_count ?? 2,
+        };
+      }
     } catch {
       // Fallback
     }
@@ -177,8 +209,8 @@ export const orgService = {
   },
 
   async createWorkspace(payload: CreateWorkspacePayload): Promise<WorkspaceItem> {
-    const res = await apiClient.post<ApiResponse<WorkspaceItem>>("/workspaces", payload);
-    return res.data.data!;
+    const res = await apiClient.post("/workspaces", payload);
+    return unpackResponse<WorkspaceItem>(res.data);
   },
 
   async deleteWorkspace(wsId: string): Promise<void> {
@@ -187,12 +219,38 @@ export const orgService = {
 
   async getOrgMembers(orgId: string): Promise<OrgMemberItem[]> {
     try {
-      const res = await apiClient.get<ApiResponse<OrgMemberItem[]>>(`/organizations/${orgId}/members`);
-      if (res.data.data && res.data.data.length > 0) {
-        return res.data.data;
+      const res = await apiClient.get(`/workspaces/${orgId}/members`);
+      const members = unpackResponse<OrgMemberItem[]>(res.data);
+      if (Array.isArray(members) && members.length > 0) {
+        return members.map((m) => ({
+          id: m.id || m.user_id,
+          user_id: m.user_id,
+          name: m.name || m.user_id.slice(0, 8),
+          email: m.email || `${m.user_id.slice(0, 6)}@twib.ai`,
+          role: m.role,
+          status: m.status,
+          joined_at: m.joined_at,
+        }));
       }
     } catch {
-      // Fallback
+      // Try org fallback
+      try {
+        const res = await apiClient.get(`/organizations/${orgId}`);
+        const org = unpackResponse<OrganizationItem>(res.data);
+        if (org && org.members && org.members.length > 0) {
+          return org.members.map((m) => ({
+            id: m.id || m.user_id,
+            user_id: m.user_id,
+            name: m.name || m.user_id.slice(0, 8),
+            email: m.email || `${m.user_id.slice(0, 6)}@twib.ai`,
+            role: m.role,
+            status: m.status,
+            joined_at: m.joined_at,
+          }));
+        }
+      } catch {
+        // Fallback
+      }
     }
 
     return [
@@ -214,36 +272,18 @@ export const orgService = {
         status: "active",
         joined_at: "2026-02-01",
       },
-      {
-        id: "mem-3",
-        user_id: "usr-3",
-        name: "Alice Smith",
-        email: "alice@twib.ai",
-        role: "member",
-        status: "active",
-        joined_at: "2026-02-10",
-      },
-      {
-        id: "mem-4",
-        user_id: "usr-4",
-        name: "Robert Johnson",
-        email: "robert@twib.ai",
-        role: "viewer",
-        status: "invited",
-        joined_at: "2026-03-01",
-      },
     ];
   },
 
   async inviteMember(orgId: string, payload: InviteMemberPayload): Promise<void> {
-    await apiClient.post(`/organizations/${orgId}/invitations`, payload);
+    await apiClient.post(`/workspaces/${orgId}/members`, payload);
   },
 
   async removeMember(orgId: string, userId: string): Promise<void> {
-    await apiClient.delete(`/organizations/${orgId}/members/${userId}`);
+    await apiClient.delete(`/workspaces/${orgId}/members/${userId}`);
   },
 
   async updateMemberRole(orgId: string, userId: string, role: string): Promise<void> {
-    await apiClient.put(`/organizations/${orgId}/members/${userId}`, { role });
+    await apiClient.patch(`/workspaces/${orgId}/members/${userId}`, { role });
   },
 };
