@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.core.logging import get_logger
 from app.infrastructure.cache import close_redis
+from app.infrastructure.database import init_db
 from app.infrastructure.vector import close_vector_store
 
 logger = get_logger(__name__)
@@ -21,6 +22,15 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         None once the application is ready to serve requests.
     """
     logger.info("Application Starting")
+    try:
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as err:
+        logger.warning(
+            "Database initialization encountered an issue",
+            error=str(err),
+        )
+
     logger.info("Application Started")
     try:
         yield

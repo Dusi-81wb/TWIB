@@ -1,4 +1,4 @@
-"""Async SQLAlchemy engine for PostgreSQL.
+"""Async SQLAlchemy engine for PostgreSQL and SQLite.
 
 This module builds the SQLAlchemy 2.0 async engine used by the whole
 application. The engine is configured from the application settings (the
@@ -20,6 +20,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.core.config import get_settings
 from app.core.settings import ApplicationSettings
@@ -31,12 +32,6 @@ _MAX_OVERFLOW = 10
 def create_engine(settings: ApplicationSettings) -> AsyncEngine:
     """Create the async SQLAlchemy engine from application settings.
 
-    The engine connects to PostgreSQL through the ``asyncpg`` driver,
-    maintains a pool of up to ``_POOL_SIZE`` persistent connections (with
-    up to ``_MAX_OVERFLOW`` temporary ones under load), and pings each
-    connection before it is checked out to avoid serving stale connections.
-    SQL echo is enabled only when the application runs in debug mode.
-
     Args:
         settings: The application settings providing ``database_url`` and
             ``debug``.
@@ -44,8 +39,18 @@ def create_engine(settings: ApplicationSettings) -> AsyncEngine:
     Returns:
         A configured async engine.
     """
+    db_url = settings.database_url or "sqlite+aiosqlite:///./twib.db"
+
+    if db_url.startswith("sqlite"):
+        return create_async_engine(
+            db_url,
+            echo=settings.debug,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+
     return create_async_engine(
-        settings.database_url,
+        db_url,
         echo=settings.debug,
         pool_pre_ping=True,
         pool_size=_POOL_SIZE,
@@ -56,12 +61,6 @@ def create_engine(settings: ApplicationSettings) -> AsyncEngine:
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
     """Return the cached application-wide async engine.
-
-    The first call loads the application settings and builds the engine;
-    subsequent calls return the same instance so the whole application
-    shares a single connection pool. The result is immutable by convention:
-    call :func:`create_engine` directly to build a different engine (for
-    example in tests).
 
     Returns:
         The shared ``AsyncEngine`` instance.

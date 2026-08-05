@@ -45,7 +45,7 @@ def get_url() -> str:
         The database connection string (e.g. postgresql+asyncpg://...).
     """
     settings = get_settings()
-    return str(settings.database_url)
+    return str(settings.database_url or "sqlite+aiosqlite:///./twib.db")
 
 
 def run_migrations_offline() -> None:

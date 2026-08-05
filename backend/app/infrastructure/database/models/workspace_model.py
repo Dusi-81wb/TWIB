@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
@@ -20,8 +21,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
 )
-from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.models.base_model import BaseModel
@@ -35,9 +36,6 @@ if TYPE_CHECKING:
 
 class WorkspaceModel(BaseModel):
     """SQLAlchemy ORM model for the Workspace aggregate root.
-
-    Maps workspace collaboration boundary details, settings, metadata, parent
-    organization relationship, owner relationship, and member child records.
 
     Attributes:
         organization_id: Foreign key referencing the parent organization.
@@ -56,13 +54,13 @@ class WorkspaceModel(BaseModel):
     __tablename__ = "workspaces"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         index=True,
         nullable=False,
@@ -132,9 +130,6 @@ class WorkspaceModel(BaseModel):
 class WorkspaceMemberModel(BaseModel):
     """SQLAlchemy ORM model for workspace memberships.
 
-    Maps user memberships inside a workspace, including workspace-level roles,
-    joined timestamps, and invitation state.
-
     Attributes:
         workspace_id: Foreign key referencing the parent workspace.
         user_id: Foreign key referencing the member user.
@@ -149,13 +144,13 @@ class WorkspaceMemberModel(BaseModel):
     __tablename__ = "workspace_memberships"
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
         nullable=False,

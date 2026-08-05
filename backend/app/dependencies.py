@@ -157,18 +157,24 @@ def get_session_service(
 def get_authentication_service(
     request: Request,
     uow: UnitOfWork = Depends(get_unit_of_work),
+    session_service: SessionService = Depends(get_session_service),
 ) -> AuthenticationService:
     """Resolve the AuthenticationService instance from the DI container.
 
     Args:
         request: The active FastAPI request.
         uow: Request-scoped UnitOfWork dependency.
+        session_service: Request-scoped SessionService dependency.
 
     Returns:
-        An ``AuthenticationService`` instance bound to the request UnitOfWork.
+        An ``AuthenticationService`` instance bound to the request UnitOfWork
+        and request SessionService.
     """
     container = get_container(request)
-    return container.authentication_service(unit_of_work=uow)
+    return container.authentication_service(
+        unit_of_work=uow,
+        session_service=session_service,
+    )
 
 
 def get_authorization_service(
@@ -301,18 +307,23 @@ def get_workspace_service(
 def get_invitation_service(
     request: Request,
     uow: UnitOfWork = Depends(get_unit_of_work),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
 ) -> InvitationService:
     """Resolve the InvitationService instance from the DI container.
 
     Args:
         request: The active FastAPI request.
         uow: Request-scoped UnitOfWork dependency.
+        workspace_service: Request-scoped WorkspaceService dependency.
 
     Returns:
         An ``InvitationService`` instance bound to the request UnitOfWork.
     """
     container = get_container(request)
-    return container.invitation_service(unit_of_work=uow)
+    return container.invitation_service(
+        unit_of_work=uow,
+        workspace_service=workspace_service,
+    )
 
 
 def get_llm_provider_factory(
@@ -340,9 +351,12 @@ def get_workflow_executor(request: Request) -> Any:
     return get_container(request).workflow_executor()
 
 
-def get_workflow_state_manager(request: Request) -> Any:
+def get_workflow_state_manager(
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> Any:
     """Resolve WorkflowStateManager instance from the DI container."""
-    return get_container(request).workflow_state_manager()
+    return get_container(request).workflow_state_manager(uow=uow)
 
 
 def get_workflow_template_service(request: Request) -> Any:

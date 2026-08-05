@@ -12,8 +12,16 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.models.base_model import BaseModel
@@ -25,9 +33,6 @@ if TYPE_CHECKING:
 
 class OrganizationModel(BaseModel):
     """SQLAlchemy ORM model for the Organization aggregate root.
-
-    Maps organization tenant boundary details, subscription plan, lifecycle status,
-    owner relationship, membership child records, and child workspaces.
 
     Attributes:
         name: Organization display name.
@@ -54,7 +59,7 @@ class OrganizationModel(BaseModel):
         nullable=False,
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         index=True,
         nullable=False,
@@ -103,9 +108,6 @@ class OrganizationModel(BaseModel):
 class OrganizationMemberModel(BaseModel):
     """SQLAlchemy ORM model for organization memberships.
 
-    Maps the relationship between users and organizations, including roles,
-    join timestamps, and invitation state.
-
     Attributes:
         organization_id: Foreign key referencing the organization.
         user_id: Foreign key referencing the user.
@@ -120,13 +122,13 @@ class OrganizationMemberModel(BaseModel):
     __tablename__ = "organization_memberships"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         index=True,
         nullable=False,

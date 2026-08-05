@@ -11,8 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Index, String
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import JSON, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.models.base_model import BaseModel
@@ -30,9 +29,6 @@ if TYPE_CHECKING:
 
 class UserModel(BaseModel):
     """SQLAlchemy ORM model for the User aggregate root.
-
-    Maps user persistence attributes and relationships. Does not contain any
-    domain logic or authentication details.
 
     Attributes:
         email: Unique, indexed user email address.

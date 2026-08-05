@@ -1,6 +1,7 @@
 """Authentication API router for v1 endpoints.
 
 Exposes endpoints for user authentication and session management:
+- ``POST /api/v1/auth/register``: Register a new user and issue access & refresh tokens.
 - ``POST /api/v1/auth/login``: Authenticate credentials, issue access & refresh tokens.
 - ``POST /api/v1/auth/refresh``: Rotate refresh token and issue a new access token.
 - ``POST /api/v1/auth/logout``: Terminate current session in Redis.
@@ -15,12 +16,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.tags import AUTHENTICATION
 from app.dependencies import get_authentication_service, get_session_service
+from app.domain.exceptions import BusinessRuleViolation
+from app.domain.users.exceptions import EmailAlreadyAssigned
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
     RefreshRequest,
     RefreshResponse,
+    RegisterRequest,
+    RegisterResponse,
 )
 from app.security.exceptions import AuthenticationError, InvalidTokenError
 from app.security.refresh_token import hash_refresh_token
@@ -28,6 +33,102 @@ from app.security.session import SessionData
 from app.services.auth import AuthenticationService, SessionService
 
 auth_router = APIRouter(prefix="/auth", tags=[AUTHENTICATION])
+
+
+@auth_router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="User Registration",
+    description=(
+        "Register a new user account with email, password, and optional display name. "
+        "Creates a new user record in the database and returns "
+        "access and refresh tokens."
+    ),
+    responses={
+        201: {
+            "description": "Successful registration with tokens.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "refresh_token": "dGhpcy1pcy1hLXJlZnJlc2gtdG9rZW4...",
+                        "token_type": "bearer",
+                        "expires_in": 1800,
+                        "user": {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "email": "user@example.com",
+                            "display_name": "Jane Doe",
+                            "role": "member",
+                            "status": "active",
+                        },
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid registration request payload.",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid email format"}}
+            },
+        },
+        409: {
+            "description": "Email address already registered.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Email 'user@example.com' is already registered"
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Validation error in request payload.",
+        },
+    },
+)
+async def register(
+    request: Request,
+    payload: RegisterRequest,
+    auth_service: AuthenticationService = Depends(get_authentication_service),
+) -> Any:
+    """Register a new user, create a session, and issue tokens.
+
+    Args:
+        request: Active FastAPI HTTP request.
+        payload: Registration payload containing email, password,
+            and optional display_name or name.
+        auth_service: Injected AuthenticationService dependency.
+
+    Returns:
+        RegisterResponse containing access token, refresh token, and user summary.
+
+    Raises:
+        HTTPException: 409 Conflict if email is registered,
+            400 Bad Request on invalid domain rules.
+    """
+    user_agent = request.headers.get("user-agent", "")
+    client_ip = request.client.host if request.client else ""
+
+    try:
+        result = await auth_service.register_user(
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.resolved_display_name,
+            user_agent=user_agent,
+            ip_address=client_ip,
+        )
+        return result
+    except EmailAlreadyAssigned as err:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(err),
+        ) from err
+    except BusinessRuleViolation as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
 
 
 @auth_router.post(

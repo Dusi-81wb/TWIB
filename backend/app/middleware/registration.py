@@ -20,14 +20,14 @@ def register_middlewares(
     """Register every middleware on a FastAPI application.
 
     Middleware added later is placed further out in the request/response
-    stack, so the effective order is security headers, request ID, CORS,
-    then observability.
+    stack, so CORS is registered last to wrap all outer responses and
+    preflight requests.
 
     Args:
         application: The FastAPI application to configure.
         settings: Application settings used to configure CORS.
     """
     application.add_middleware(ObservabilityMiddleware)
-    configure_cors(application, settings)
     application.add_middleware(RequestIDMiddleware)
     application.add_middleware(SecurityHeadersMiddleware)
+    configure_cors(application, settings)
