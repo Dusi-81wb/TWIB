@@ -19,8 +19,11 @@ from app.authorization.roles import (
     is_org_role_at_least,
     is_workspace_role_at_least,
 )
+from app.core.logging import get_logger
 from app.domain.repositories.unit_of_work import UnitOfWork
 from app.domain.value_objects import UuidIdentity
+
+logger = get_logger(__name__)
 
 
 class AuthorizationService:
@@ -108,6 +111,7 @@ class AuthorizationService:
             u_uuid = uuid.UUID(user_id)
             o_uuid = uuid.UUID(org_id)
         except ValueError:
+            logger.warning("Invalid UUID format provided for organization access check", exc_info=True)
             return False
 
         async with self._uow as uow:
@@ -150,6 +154,7 @@ class AuthorizationService:
             u_uuid = uuid.UUID(user_id)
             w_uuid = uuid.UUID(workspace_id)
         except ValueError:
+            logger.warning("Invalid UUID format provided for workspace access check", exc_info=True)
             return False
 
         async with self._uow as uow:
@@ -196,6 +201,7 @@ class AuthorizationService:
         try:
             u_uuid = uuid.UUID(user_id)
         except ValueError:
+            logger.warning("Invalid user UUID format provided for effective permissions check", exc_info=True)
             return effective
 
         async with self._uow as uow:
@@ -220,7 +226,7 @@ class AuthorizationService:
                         if m is not None:
                             effective.update(get_permissions_for_org_role(m.role.value))
             except ValueError:
-                pass
+                logger.warning("Invalid organization UUID format provided for effective permissions check", exc_info=True)
 
         if workspace_id:
             try:
@@ -239,6 +245,6 @@ class AuthorizationService:
                                 get_permissions_for_workspace_role(wm.role.value)
                             )
             except ValueError:
-                pass
+                logger.warning("Invalid workspace UUID format provided for effective permissions check", exc_info=True)
 
         return effective
