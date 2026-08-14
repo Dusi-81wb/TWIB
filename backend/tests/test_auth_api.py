@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_authentication_service
+from app.dependencies import get_authentication_service, get_session_service
 from app.domain.users.exceptions import EmailAlreadyAssigned
 
 
@@ -15,6 +15,7 @@ class MockAuthenticationService:
 
     def __init__(self) -> None:
         self.users: dict[str, dict[str, Any]] = {}
+        self.logout_calls: list[str | None] = []
 
     async def register_user(
         self,
@@ -45,6 +46,17 @@ class MockAuthenticationService:
             "user": user_info,
         }
 
+    async def logout_user(self, refresh_token: str | None = None) -> None:
+        """Mock implementation of logout_user."""
+        self.logout_calls.append(refresh_token)
+
+
+class MockSessionService:
+    def __init__(self) -> None:
+        self.invalidated_tokens: list[str] = []
+
+    async def invalidate_session_by_token(self, token: str) -> None:
+        self.invalidated_tokens.append(token)
 
 def test_register_user_api_success(client: TestClient) -> None:
     """Test POST /api/v1/auth/register creates user and returns tokens."""
@@ -109,5 +121,45 @@ def test_register_user_api_invalid_payload(client: TestClient) -> None:
         }
         response = client.post("/api/v1/auth/register", json=payload)
         assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+def test_logout_api_with_token(client: TestClient) -> None:
+    """Test POST /api/v1/auth/logout with a valid refresh_token."""
+    mock_auth_service = MockAuthenticationService()
+    mock_session_service = MockSessionService()
+    app = cast(Any, client.app)
+    app.dependency_overrides[get_authentication_service] = lambda: mock_auth_service
+    app.dependency_overrides[get_session_service] = lambda: mock_session_service
+
+    try:
+        payload = {"refresh_token": "mock_refresh_token_to_logout"}
+        response = client.post("/api/v1/auth/logout", json=payload)
+
+        assert response.status_code == 200
+        assert response.json()["message"] == "Successfully logged out"
+
+        assert "mock_refresh_token_to_logout" in mock_session_service.invalidated_tokens
+        assert mock_auth_service.logout_calls == ["mock_refresh_token_to_logout"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_logout_api_without_token(client: TestClient) -> None:
+    """Test POST /api/v1/auth/logout without a refresh_token payload."""
+    mock_auth_service = MockAuthenticationService()
+    mock_session_service = MockSessionService()
+    app = cast(Any, client.app)
+    app.dependency_overrides[get_authentication_service] = lambda: mock_auth_service
+    app.dependency_overrides[get_session_service] = lambda: mock_session_service
+
+    try:
+        response = client.post("/api/v1/auth/logout")
+
+        assert response.status_code == 200
+        assert response.json()["message"] == "Successfully logged out"
+
+        assert len(mock_session_service.invalidated_tokens) == 0
+        assert mock_auth_service.logout_calls == [None]
     finally:
         app.dependency_overrides.clear()
