@@ -51,6 +51,8 @@ Rules:
 Do NOT include any text outside the JSON object.
 """
 
+_DOC_TYPE_PATTERN = re.compile(r"readme|spec|doc|guide|summary")
+
 
 class DocType(StrEnum):
     """Supported document types for the Documentation Agent."""
@@ -243,9 +245,7 @@ class DocumentationAgent(BaseAgent):
         # Check if custom doc type string or member of DocType
         supported = {e.value for e in DocType}
         normalized = str(doc_type_val).strip().lower()
-        if normalized not in supported and not any(
-            k in normalized for k in ["readme", "spec", "doc", "guide", "summary"]
-        ):
+        if normalized not in supported and not _DOC_TYPE_PATTERN.search(normalized):
             raise AgentValidationError(
                 f"Unsupported documentation type '{doc_type_val}'. "
                 f"Supported types: {sorted(supported)}",
