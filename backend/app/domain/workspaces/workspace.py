@@ -57,11 +57,13 @@ from app.domain.workspaces.membership import (
     WorkspaceMembershipStatus,
     WorkspaceRole,
 )
+from app.domain.workspaces.lifecycle_mixin import WorkspaceLifecycleMixin
+from app.domain.workspaces.membership_mixin import WorkspaceMembershipMixin
 from app.domain.workspaces.settings import WorkspaceSettings
 from app.domain.workspaces.status import WorkspaceStatus
 
 
-class Workspace(AggregateRoot[uuid.UUID]):
+class Workspace(WorkspaceMembershipMixin, WorkspaceLifecycleMixin, AggregateRoot[uuid.UUID]):
     """A workspace, the collaboration boundary inside an organization.
 
     The workspace is an aggregate root whose state is entirely built from
@@ -302,185 +304,6 @@ class Workspace(AggregateRoot[uuid.UUID]):
         self._description = new_description
         self._touch()
 
-    def change_owner(self, new_owner_id: UuidIdentity) -> None:
-        """Transfer ownership to an existing member.
-
-        The new owner's membership role becomes OWNER and the previous owner's
-        membership role becomes ADMIN.
-
-        Args:
-            new_owner_id: The identity of the new owner.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is deleted or the user is
-                not a member.
-            WorkspaceArchived: When the workspace is archived.
-        """
-        self._assert_mutable()
-        if new_owner_id not in self._members:
-            raise InvalidWorkspaceState(
-                f"User {new_owner_id} is not a member and cannot become the owner"
-            )
-        if new_owner_id == self._owner_id:
-            return
-        previous_owner = self._owner_id
-        self._owner_id = new_owner_id
-        self._change_member_role(new_owner_id, WorkspaceRole.OWNER)
-        self._change_member_role(previous_owner, WorkspaceRole.ADMIN)
-        self._touch()
-        self.record_event(
-            WorkspaceOwnerChanged(
-                workspace_id=self._workspace_id,
-                owner_id=new_owner_id,
-                previous_owner_id=previous_owner,
-            )
-        )
-
-    def archive(self) -> None:
-        """Archive the workspace.
-
-        An archived workspace cannot be modified until it is restored.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is deleted.
-            WorkspaceArchived: When the workspace is already archived.
-        """
-        self._assert_not_deleted()
-        if self._status is WorkspaceStatus.ARCHIVED:
-            raise WorkspaceArchivedError(
-                f"Workspace {self._workspace_id} is already archived"
-            )
-        self._status = WorkspaceStatus.ARCHIVED
-        self._touch()
-        self.record_event(WorkspaceArchivedEvent(workspace_id=self._workspace_id))
-
-    def restore(self) -> None:
-        """Restore an archived workspace to the active state.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is not currently
-                archived.
-        """
-        if self._status is not WorkspaceStatus.ARCHIVED:
-            raise InvalidWorkspaceState(
-                f"Workspace {self._workspace_id} is not archived, cannot restore"
-            )
-        self._status = WorkspaceStatus.ACTIVE
-        self._touch()
-
-    def activate(self) -> None:
-        """Activate the workspace.
-
-        A suspended workspace becomes active.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is already active or
-                deleted.
-            WorkspaceArchived: When the workspace is archived; restore it
-                first.
-        """
-        self._assert_not_deleted()
-        if self._status is WorkspaceStatus.ACTIVE:
-            raise InvalidWorkspaceState(
-                f"Workspace {self._workspace_id} is already active"
-            )
-        if self._status is WorkspaceStatus.ARCHIVED:
-            raise WorkspaceArchivedError(
-                f"Workspace {self._workspace_id} is archived; restore it first"
-            )
-        self._status = WorkspaceStatus.ACTIVE
-        self._touch()
-
-    def suspend(self) -> None:
-        """Suspend the workspace.
-
-        An active workspace becomes suspended.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is already suspended or
-                deleted.
-            WorkspaceArchived: When the workspace is archived.
-        """
-        self._assert_not_deleted()
-        if self._status is WorkspaceStatus.SUSPENDED:
-            raise InvalidWorkspaceState(
-                f"Workspace {self._workspace_id} is already suspended"
-            )
-        if self._status is WorkspaceStatus.ARCHIVED:
-            raise WorkspaceArchivedError(
-                f"Archived workspace {self._workspace_id} cannot be suspended"
-            )
-        self._status = WorkspaceStatus.SUSPENDED
-        self._touch()
-
-    def add_member(
-        self, user_id: UuidIdentity, role: WorkspaceRole = WorkspaceRole.VIEWER
-    ) -> None:
-        """Add an active member to the workspace.
-
-        The owner is added automatically at construction, so the owner should
-        not be added again.
-
-        Args:
-            user_id: The identity of the member to add.
-            role: The role the member will hold (defaults to VIEWER).
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is deleted.
-            WorkspaceArchived: When the workspace is archived.
-            DuplicateWorkspaceMember: When the user is already a member.
-        """
-        self._assert_mutable()
-        if user_id in self._members:
-            raise DuplicateWorkspaceMember(
-                f"User {user_id} is already a member of workspace {self._workspace_id}"
-            )
-        self._members[user_id] = WorkspaceMembership(
-            user_id=user_id,
-            role=role,
-            joined_at=Timestamp.now(),
-            status=WorkspaceMembershipStatus.ACTIVE,
-            invitation_accepted=True,
-        )
-        self._touch()
-        self.record_event(
-            WorkspaceMemberAdded(
-                workspace_id=self._workspace_id,
-                user_id=user_id,
-                role=role,
-            )
-        )
-
-    def remove_member(self, user_id: UuidIdentity) -> None:
-        """Remove a member from the workspace.
-
-        The owner cannot be removed; transfer ownership first.
-
-        Args:
-            user_id: The identity of the member to remove.
-
-        Raises:
-            InvalidWorkspaceState: When the workspace is deleted or the user is
-                not a member.
-            WorkspaceArchived: When the workspace is archived.
-            OwnerCannotBeRemoved: When the user is the workspace owner.
-        """
-        self._assert_mutable()
-        if user_id == self._owner_id:
-            raise OwnerCannotBeRemoved(
-                f"Owner user {user_id} cannot be removed from workspace "
-                f"{self._workspace_id}; transfer ownership first"
-            )
-        if user_id not in self._members:
-            raise InvalidWorkspaceState(
-                f"User {user_id} is not a member of workspace {self._workspace_id}"
-            )
-        del self._members[user_id]
-        self._touch()
-        self.record_event(
-            WorkspaceMemberRemoved(workspace_id=self._workspace_id, user_id=user_id)
-        )
-
     def update_settings(self, new_settings: WorkspaceSettings) -> None:
         """Replace the workspace's settings.
 
@@ -537,17 +360,6 @@ class Workspace(AggregateRoot[uuid.UUID]):
         """
         self._assert_mutable()
         self._bump_version()
-
-    def _change_member_role(self, user_id: UuidIdentity, role: WorkspaceRole) -> None:
-        """Replace a member's role while preserving the rest of the membership."""
-        membership = self._members[user_id]
-        self._members[user_id] = WorkspaceMembership(
-            user_id=membership.user_id,
-            role=role,
-            joined_at=membership.joined_at,
-            status=membership.status,
-            invitation_accepted=membership.invitation_accepted,
-        )
 
     def _assert_not_deleted(self) -> None:
         """Raise when the workspace is deleted.
