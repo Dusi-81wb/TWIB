@@ -19,8 +19,11 @@ from app.authorization.roles import (
     is_org_role_at_least,
     is_workspace_role_at_least,
 )
+from app.core.logging import get_logger
 from app.domain.repositories.unit_of_work import UnitOfWork
 from app.domain.value_objects import UuidIdentity
+
+logger = get_logger(__name__)
 
 
 class AuthorizationService:
@@ -219,8 +222,8 @@ class AuthorizationService:
                         m = org.get_member(UuidIdentity(u_uuid))
                         if m is not None:
                             effective.update(get_permissions_for_org_role(m.role.value))
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.warning("Invalid organization ID format", error=str(e), org_id=org_id)
 
         if workspace_id:
             try:
@@ -238,7 +241,7 @@ class AuthorizationService:
                             effective.update(
                                 get_permissions_for_workspace_role(wm.role.value)
                             )
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.warning("Invalid workspace ID format", error=str(e), workspace_id=workspace_id)
 
         return effective
