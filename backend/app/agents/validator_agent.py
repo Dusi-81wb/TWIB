@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core.logging import get_logger
+
 from app.agents.base_agent import BaseAgent
 from app.agents.exceptions import AgentExecutionError, AgentValidationError
 from app.agents.models import (
@@ -26,6 +28,8 @@ from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
 
 VALIDATOR_SYSTEM_PROMPT = """You are the TWIB Validator Agent, an objective auditor.
 Your responsibility is to evaluate output produced by other AI agents.
@@ -307,7 +311,11 @@ class ValidatorAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to decode JSON from extracted block",
+                        exc_info=True,
+                        extra={"extracted_block": match.group(0)},
+                    )
 
         raise AgentValidationError(
             f"Failed to parse validation JSON from LLM: {text[:150]}...",
