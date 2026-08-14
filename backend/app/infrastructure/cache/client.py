@@ -125,6 +125,10 @@ class RedisClient:
         raw_keys = await self._redis.keys(pattern)
         return [k if isinstance(k, str) else k.decode("utf-8") for k in raw_keys]
 
+    def pipeline(self):
+        """Create and return a new pipeline."""
+        return self._redis.pipeline()
+
     async def ping(self) -> bool:
         """Ping the Redis server to verify connectivity.
 

@@ -238,21 +238,38 @@ class SessionService:
             return 0
 
         keys = await self._redis.keys("session:*")
+        if not keys:
+            return 0
+
         count = 0
+
+        # Use pipeline to fetch all sessions in a single network round-trip
+        pipe = self._redis.pipeline()
         for session_key in keys:
-            session_json = await self._redis.get(session_key)
+            pipe.get(session_key)
+
+        session_jsons = await pipe.execute()
+
+        delete_pipe = self._redis.pipeline()
+        for session_key, session_json in zip(keys, session_jsons):
             if not session_json:
                 continue
+
+            if isinstance(session_json, bytes):
+                session_json = session_json.decode("utf-8")
 
             try:
                 session = SessionData.from_json(session_json)
             except Exception:
-                await self._redis.delete(session_key)
+                delete_pipe.delete(session_key)
                 continue
 
             if session.user_id == user_id:
                 hash_key = f"refresh_hash:{session.refresh_token_hash}"
-                await self._redis.delete(session_key, hash_key)
+                delete_pipe.delete(session_key, hash_key)
                 count += 1
+
+        if delete_pipe:
+            await delete_pipe.execute()
 
         return count
