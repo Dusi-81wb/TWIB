@@ -21,10 +21,13 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
 
 PLANNER_SYSTEM_PROMPT = """You are the TWIB Planner Agent, an expert
 enterprise system architect.
@@ -320,8 +323,8 @@ class PlannerAgent(BaseAgent):
                     parsed = json.loads(match.group(0))
                     if isinstance(parsed, dict):
                         return parsed
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as err:
+                    logger.warning("Fallback JSON parsing failed", error=str(err))
 
         raise AgentValidationError(
             f"Failed to parse structured JSON plan from LLM response: {text[:200]}...",
