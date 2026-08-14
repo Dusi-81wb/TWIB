@@ -130,3 +130,4 @@ cov-int/
 kubeconfig
 .helm/
 charts/*.tgz
+*.db
