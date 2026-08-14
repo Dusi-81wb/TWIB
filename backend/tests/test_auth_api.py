@@ -111,3 +111,25 @@ def test_register_user_api_invalid_payload(client: TestClient) -> None:
         assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()
+
+
+def test_login_user_api_invalid_payload(client: TestClient) -> None:
+    """Test POST /api/v1/auth/login fails with 422 for bad schema."""
+    mock_service = MockAuthenticationService()
+    app = cast(Any, client.app)
+    app.dependency_overrides[get_authentication_service] = lambda: mock_service
+
+    try:
+        # Missing email
+        response = client.post("/api/v1/auth/login", json={"password": "password"})
+        assert response.status_code == 422
+
+        # Missing password
+        response = client.post("/api/v1/auth/login", json={"email": "test@example.com"})
+        assert response.status_code == 422
+
+        # Invalid email
+        response = client.post("/api/v1/auth/login", json={"email": "not-an-email", "password": "password"})
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
