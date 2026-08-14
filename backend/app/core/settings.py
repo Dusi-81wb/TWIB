@@ -6,6 +6,7 @@ with the ``APP_ENV`` environment variable.
 """
 
 import json
+import logging
 from typing import Any
 
 from pydantic import Field, field_validator
@@ -13,6 +14,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import API_PREFIX, SERVICE_NAME, VERSION
 from app.core.environments import Environment
+
+logger = logging.getLogger(__name__)
 
 
 class ApplicationSettings(BaseSettings):
@@ -98,8 +101,8 @@ class ApplicationSettings(BaseSettings):
                     if isinstance(parsed, list):
                         res = [str(item).strip() for item in parsed if item]
                         return res if res else default_origins
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    logger.warning("Failed to parse cors_origins as JSON", exc_info=e)
             res = [item.strip() for item in v_str.split(",") if item.strip()]
             return res if res else default_origins
         if isinstance(v, list):
