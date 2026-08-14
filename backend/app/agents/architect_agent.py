@@ -21,10 +21,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 ARCHITECT_SYSTEM_PROMPT = """You are the TWIB Architect Agent, a principal
 system architect. Your responsibility is to convert requirements into a
@@ -312,7 +316,10 @@ class ArchitectAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in ArchitectAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse architecture JSON from LLM: {text[:150]}...",

@@ -21,10 +21,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 ANALYST_SYSTEM_PROMPT = """You are the TWIB Analyst Agent, an expert analyst.
 Your responsibility is to synthesize planning and research outputs into clear,
@@ -303,7 +307,10 @@ class AnalystAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in AnalystAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse requirements JSON from LLM: {text[:150]}...",

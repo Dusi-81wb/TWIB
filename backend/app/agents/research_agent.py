@@ -21,10 +21,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 RESEARCHER_SYSTEM_PROMPT = """You are the TWIB Research Agent, an objective
 domain researcher. Your responsibility is to gather and summarize factual
@@ -281,7 +285,10 @@ class ResearchAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in ResearchAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse research report JSON: {text[:150]}...",

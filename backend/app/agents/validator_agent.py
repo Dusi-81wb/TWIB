@@ -22,10 +22,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 VALIDATOR_SYSTEM_PROMPT = """You are the TWIB Validator Agent, an objective auditor.
 Your responsibility is to evaluate output produced by other AI agents.
@@ -307,7 +311,10 @@ class ValidatorAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in ValidatorAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse validation JSON from LLM: {text[:150]}...",

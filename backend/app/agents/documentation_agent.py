@@ -22,10 +22,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 DOCUMENTATION_SYSTEM_PROMPT = """You are the TWIB Documentation Agent, a writer.
 Your responsibility is to transform provided content into documentation.
@@ -333,7 +337,10 @@ class DocumentationAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in DocumentationAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse documentation JSON from LLM: {text[:150]}...",

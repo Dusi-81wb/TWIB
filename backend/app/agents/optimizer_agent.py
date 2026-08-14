@@ -21,10 +21,14 @@ from app.agents.models import (
     AgentResponse,
     AgentStatus,
 )
+from app.core.logging import get_logger
 from app.infrastructure.llm.conversation import Conversation
 from app.infrastructure.llm.exceptions import LLMProviderError
 from app.infrastructure.llm.factory import LLMProviderFactory
 from app.infrastructure.llm.response import ChatRequest
+
+logger = get_logger(__name__)
+
 
 OPTIMIZER_SYSTEM_PROMPT = """You are the TWIB Optimizer Agent, an expert
 optimizer. Your responsibility is to refine validated outputs to improve
@@ -290,7 +294,10 @@ class OptimizerAgent(BaseAgent):
                     if isinstance(parsed, dict):
                         return parsed
                 except json.JSONDecodeError:
-                    pass
+                    logger.warning(
+                        "Failed to parse regex match as JSON in OptimizerAgent",
+                        exc_info=True,
+                    )
 
         raise AgentValidationError(
             f"Failed to parse optimization JSON from LLM: {text[:150]}...",
