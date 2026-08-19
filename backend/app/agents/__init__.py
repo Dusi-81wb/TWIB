@@ -15,6 +15,13 @@ Exposes base agent abstractions, models, capabilities, and exceptions for TWIB:
 """
 
 from app.agents.agent import BaseAgent
+from app.agents.agent_dag import (
+    AgentDAGPlan,
+    AgentNode,
+    DAGExecutionResult,
+    NodeExecutionRecord,
+    NodeStatus,
+)
 from app.agents.analyst_agent import (
     AnalystAgent,
     RequirementsAnalysis,
@@ -23,6 +30,8 @@ from app.agents.architect_agent import (
     ArchitectAgent,
     ArchitectureDesign,
 )
+from app.agents.dag_dispatcher import AsyncDAGDispatcher
+from app.agents.dag_planner import DynamicDAGPlanner
 from app.agents.documentation_agent import (
     DocSection,
     DocType,
@@ -69,10 +78,12 @@ from app.agents.validator_agent import (
 
 __all__ = [
     "AgentCapability",
+    "AgentDAGPlan",
     "AgentError",
     "AgentExecutionError",
     "AgentExecutionStep",
     "AgentMetadata",
+    "AgentNode",
     "AgentNotFoundError",
     "AgentRequest",
     "AgentResponse",
@@ -81,12 +92,17 @@ __all__ = [
     "AnalystAgent",
     "ArchitectAgent",
     "ArchitectureDesign",
+    "AsyncDAGDispatcher",
     "BaseAgent",
+    "DAGExecutionResult",
     "DocSection",
     "DocType",
     "DocumentationAgent",
     "DocumentationOutput",
+    "DynamicDAGPlanner",
     "ExecutionPlan",
+    "NodeExecutionRecord",
+    "NodeStatus",
     "OptimizationResult",
     "OptimizerAgent",
     "PlannerAgent",

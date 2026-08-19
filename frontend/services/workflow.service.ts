@@ -25,19 +25,26 @@ export interface WorkflowStepItem {
   name: string;
   agent_id: string;
   status: string;
+  input_data?: any;
+  output_data?: any;
+  duration_seconds?: number;
   started_at?: string;
   completed_at?: string;
   error?: string;
 }
 
 export interface WorkflowResponseData {
+  id: string;
   workflow_id: string;
+  name: string;
   workflow_name: string;
   user_request: string;
+  status: string;
   workflow_status: string;
   current_state?: string;
   current_step?: string;
   execution_steps?: WorkflowStepItem[];
+  metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
   duration_seconds?: number;
@@ -56,6 +63,27 @@ export interface WorkflowDiagnosticsData {
 }
 
 export const workflowService = {
+  async getWorkflows(): Promise<WorkflowResponseData[]> {
+    try {
+      const res = await apiClient.get("/workflows");
+      const { items } = unpackPaginatedResponse<any>(res.data);
+      if (items && Array.isArray(items)) {
+        return items.map((w) => ({
+          ...w,
+          id: w.id || w.workflow_id,
+          workflow_id: w.workflow_id || w.id,
+          name: w.name || w.workflow_name,
+          workflow_name: w.workflow_name || w.name,
+          status: w.status || w.workflow_status || "pending",
+          workflow_status: w.workflow_status || w.status || "pending",
+        }));
+      }
+    } catch {
+      // Empty array on failure
+    }
+    return [];
+  },
+
   async getTemplates(): Promise<WorkflowTemplateItem[]> {
     try {
       const res = await apiClient.get("/workflows/templates");
@@ -71,27 +99,9 @@ export const workflowService = {
         }));
       }
     } catch {
-      // Fallback if unreachable
+      // Fallback
     }
-
-    return [
-      {
-        id: "tpl-code-review",
-        name: "Autonomous Code Audit Pipeline",
-        category: "engineering",
-        description: "Executes Research, Analyst, Architect, and Validator agents for full repository quality verification.",
-        suggested_prompt: "Audit security vulnerability posture in backend/app/auth",
-        agent_pipeline: ["research", "analyst", "architect", "validator"],
-      },
-      {
-        id: "tpl-api-contract",
-        name: "OpenAPI Architecture Synthesizer",
-        category: "architecture",
-        description: "Generates OpenAPI specification, database migration, and domain schemas.",
-        suggested_prompt: "Design scalable multi-tenant RBAC database schema",
-        agent_pipeline: ["planner", "architect", "documentation"],
-      },
-    ];
+    return [];
   },
 
   async createWorkflow(payload: CreateWorkflowPayload): Promise<WorkflowResponseData> {
@@ -100,7 +110,16 @@ export const workflowService = {
         `/workflows/templates/${payload.template_id}/instantiate`,
         { user_request: payload.user_request }
       );
-      const wf = unpackResponse<WorkflowResponseData>(res.data);
+      const raw = unpackResponse<any>(res.data);
+      const wf: WorkflowResponseData = {
+        ...raw,
+        id: raw.id || raw.workflow_id,
+        workflow_id: raw.workflow_id || raw.id,
+        name: raw.name || raw.workflow_name,
+        workflow_name: raw.workflow_name || raw.name,
+        status: raw.status || raw.workflow_status || "pending",
+        workflow_status: raw.workflow_status || raw.status || "pending",
+      };
       if (payload.start_immediately && wf?.workflow_id) {
         await this.startWorkflow(wf.workflow_id);
       }
@@ -112,7 +131,16 @@ export const workflowService = {
       user_request: payload.user_request,
       category: payload.category || "custom",
     });
-    const wf = unpackResponse<WorkflowResponseData>(res.data);
+    const raw = unpackResponse<any>(res.data);
+    const wf: WorkflowResponseData = {
+      ...raw,
+      id: raw.id || raw.workflow_id,
+      workflow_id: raw.workflow_id || raw.id,
+      name: raw.name || raw.workflow_name,
+      workflow_name: raw.workflow_name || raw.name,
+      status: raw.status || raw.workflow_status || "pending",
+      workflow_status: raw.workflow_status || raw.status || "pending",
+    };
 
     if (payload.start_immediately && wf?.workflow_id) {
       await this.startWorkflow(wf.workflow_id);
@@ -127,7 +155,16 @@ export const workflowService = {
 
   async getWorkflow(workflowId: string): Promise<WorkflowResponseData> {
     const res = await apiClient.get(`/workflows/${workflowId}`);
-    return unpackResponse<WorkflowResponseData>(res.data);
+    const raw = unpackResponse<any>(res.data);
+    return {
+      ...raw,
+      id: raw.id || raw.workflow_id,
+      workflow_id: raw.workflow_id || raw.id,
+      name: raw.name || raw.workflow_name,
+      workflow_name: raw.workflow_name || raw.name,
+      status: raw.status || raw.workflow_status || "pending",
+      workflow_status: raw.workflow_status || raw.status || "pending",
+    };
   },
 
   async getWorkflowHistory(workflowId: string): Promise<WorkflowStepItem[]> {

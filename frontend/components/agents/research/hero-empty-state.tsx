@@ -83,7 +83,7 @@ export function HeroEmptyState({ onSelectSuggestion }: HeroEmptyStateProps) {
             <div
               key={idx}
               onClick={() => onSelectSuggestion(item.prompt)}
-              className="group text-left p-4 rounded-2xl border border-border/70 bg-card/40 hover:bg-accent/60 hover:border-primary/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md space-y-2"
+              className="group text-left p-4 rounded-2xl glass-card border border-white/10 hover:bg-primary/10 hover:border-primary/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md space-y-2"
             >
               <div className="flex items-center gap-2 text-foreground font-semibold text-xs group-hover:text-primary transition-colors">
                 <Icon className="h-4 w-4 text-primary shrink-0" />

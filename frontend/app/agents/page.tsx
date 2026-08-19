@@ -10,11 +10,14 @@ import { RightPanel } from "@/components/dashboard/right-panel";
 import { AgentSelector } from "@/features/agents/agent-selector";
 import { AgentInfoCard } from "@/features/agents/agent-info-card";
 import { PromptEditor } from "@/features/agents/prompt-editor";
-import { OutputViewer } from "@/features/agents/output-viewer";
+import { OutputViewer, AgentChatTurn } from "@/features/agents/output-viewer";
 import { ExecutionHistory } from "@/features/agents/execution-history";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, Cpu, Layers, Bot, ArrowRight, ShieldCheck, Zap } from "lucide-react";
+import { useGsapStagger } from "@/hooks/use-gsap-animations";
 
 export default function AgentsPage() {
+  const staggerRef = useGsapStagger<HTMLDivElement>(".gsap-agent-card");
+
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ["agents-roster"],
     queryFn: () => agentService.getAgents(),
@@ -24,32 +27,8 @@ export default function AgentsPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [lastResponse, setLastResponse] = useState<AgentExecuteResponse | null>(null);
   const [executeError, setExecuteError] = useState<string | null>(null);
-  const [recentHistory, setRecentHistory] = useState<RecentExecutionItem[]>([
-    {
-      id: "hist-1",
-      agentType: "planner",
-      status: "completed",
-      durationSeconds: 2.3,
-      timestamp: "10 mins ago",
-      promptSnippet: "Decompose hospital management system requirements...",
-    },
-    {
-      id: "hist-2",
-      agentType: "research",
-      status: "completed",
-      durationSeconds: 4.1,
-      timestamp: "25 mins ago",
-      promptSnippet: "Search global AI market benchmarks 2026...",
-    },
-    {
-      id: "hist-3",
-      agentType: "architect",
-      status: "completed",
-      durationSeconds: 3.2,
-      timestamp: "1 hour ago",
-      promptSnippet: "Design microservice API contracts for OAuth2...",
-    },
-  ]);
+  const [recentHistory, setRecentHistory] = useState<RecentExecutionItem[]>([]);
+  const [turnsByAgent, setTurnsByAgent] = useState<Record<string, AgentChatTurn[]>>({});
 
   const activeAgent = selectedAgent || agents[0] || {
     id: "planner",
@@ -60,15 +39,56 @@ export default function AgentsPage() {
     capabilities: ["Task Decomposition", "Execution Strategy"],
   };
 
-  const handleExecute = async (prompt: string) => {
+  const currentTurns = turnsByAgent[activeAgent.type] || [];
+
+  const handleExecute = async (params: { prompt: string; model?: string; temperature?: number; context?: Record<string, any> }) => {
     setIsExecuting(true);
     setExecuteError(null);
+
+    const userTurn: AgentChatTurn = {
+      id: `usr-${Date.now()}`,
+      role: "user",
+      content: params.prompt,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setTurnsByAgent((prev) => ({
+      ...prev,
+      [activeAgent.type]: [...(prev[activeAgent.type] || []), userTurn],
+    }));
+
     try {
       const res = await agentService.executeAgent({
         agent_type: activeAgent.type,
-        prompt,
+        prompt: params.prompt,
+        model: params.model,
+        temperature: params.temperature,
+        context: params.context,
       });
       setLastResponse(res);
+
+      const assistantOutputText =
+        typeof res.output === "string"
+          ? res.output
+          : formatAgentOutputAsMarkdown(res.output);
+
+      const assistantTurn: AgentChatTurn = {
+        id: res.execution_id || `asst-${Date.now()}`,
+        role: "assistant",
+        content: assistantOutputText,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        agentType: activeAgent.name,
+        model: res.model,
+        durationSeconds: res.duration_seconds,
+        confidence: res.confidence,
+        tokens: res.tokens,
+        rawOutput: res.output,
+      };
+
+      setTurnsByAgent((prev) => ({
+        ...prev,
+        [activeAgent.type]: [...(prev[activeAgent.type] || []), assistantTurn],
+      }));
 
       setRecentHistory((prev) => [
         {
@@ -77,7 +97,7 @@ export default function AgentsPage() {
           status: res.status,
           durationSeconds: res.duration_seconds,
           timestamp: "Just now",
-          promptSnippet: prompt.slice(0, 45) + (prompt.length > 45 ? "..." : ""),
+          promptSnippet: params.prompt.slice(0, 45) + (params.prompt.length > 45 ? "..." : ""),
         },
         ...prev,
       ]);
@@ -101,7 +121,7 @@ export default function AgentsPage() {
             <TopBar />
             <div className="flex-1 flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-              <span className="text-sm text-muted-foreground">Loading Agent Console...</span>
+              <span className="text-sm text-muted-foreground font-mono">Loading Live Agent Roster...</span>
             </div>
           </div>
         </div>
@@ -116,58 +136,56 @@ export default function AgentsPage() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar />
           <div className="flex-1 flex overflow-hidden">
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
-              <div className="flex flex-col space-y-1">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  AI Agent Console
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Directly trigger, inspect, and evaluate individual autonomous agents.
+            <main ref={staggerRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+              {/* Header */}
+              <div className="gsap-agent-card flex flex-col space-y-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                    Autonomous <span className="motion-gradient-text">Agent Studio</span>
+                  </h1>
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Trigger live multi-turn executions across specialized worker agents with real model credentials from your configured gateway.
                 </p>
               </div>
 
-              {/* Grid: Agent Selection & Prompt Input */}
+              {/* Grid: Agent Selection & Execution */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Agent Selector & Specifications */}
-                <div className="space-y-4">
+                {/* Left Column: Agent Selector, Specifications, History */}
+                <div className="gsap-agent-card space-y-4">
                   <AgentSelector
                     agents={agents}
                     selectedAgent={activeAgent}
-                    onSelectAgent={(agent) => setSelectedAgent(agent)}
+                    onSelectAgent={(agent) => {
+                      setSelectedAgent(agent);
+                      setExecuteError(null);
+                    }}
                     disabled={isExecuting}
                   />
+
                   <AgentInfoCard agent={activeAgent} />
-                  {activeAgent.type === "research" && (
-                    <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5 flex items-center justify-between">
-                      <div className="text-xs">
-                        <span className="font-bold text-foreground block">OmniRoute LLM Gateway</span>
-                        <span className="text-muted-foreground text-[11px]">Dedicated Research Agent UI</span>
-                      </div>
-                      <a
-                        href="/agents/research"
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
-                      >
-                        Open Console &rarr;
-                      </a>
-                    </div>
-                  )}
+
+                  <ExecutionHistory items={recentHistory} />
                 </div>
 
-                {/* Right Column: Prompt Editor */}
-                <div className="lg:col-span-2">
+                {/* Right 2 Columns: Live Model Prompt Editor & Gemini-Style Interactive Output Canvas */}
+                <div className="lg:col-span-2 space-y-6 gsap-agent-card">
                   <PromptEditor
                     onExecute={handleExecute}
                     isExecuting={isExecuting}
-                    defaultPrompt={`Execute task analysis for ${activeAgent.role}`}
+                    agentType={activeAgent.name}
+                  />
+
+                  <OutputViewer
+                    response={lastResponse}
+                    error={executeError}
+                    agentType={activeAgent.name}
+                    turns={currentTurns}
+                    isExecuting={isExecuting}
                   />
                 </div>
               </div>
-
-              {/* Output Response Panel */}
-              <OutputViewer response={lastResponse} error={executeError} />
-
-              {/* Recent Execution History */}
-              <ExecutionHistory items={recentHistory} />
             </main>
 
             <RightPanel />
@@ -176,4 +194,29 @@ export default function AgentsPage() {
       </div>
     </ProtectedRoute>
   );
+}
+
+function formatAgentOutputAsMarkdown(obj: any): string {
+  if (!obj || typeof obj !== "object") return String(obj || "");
+  const parts: string[] = [];
+  if (obj.topic) parts.push(`# ${obj.topic}\n`);
+  if (obj.system_overview) parts.push(`## System Overview\n${obj.system_overview}\n`);
+  if (obj.summary || obj.analysis_summary) parts.push(`## Summary\n${obj.summary || obj.analysis_summary}\n`);
+  if (Array.isArray(obj.key_findings)) {
+    parts.push(`### Key Findings\n` + obj.key_findings.map((f: string) => `- ${f}`).join("\n") + "\n");
+  }
+  if (Array.isArray(obj.components)) {
+    parts.push(`### Core Architectural Components\n` + obj.components.map((c: string) => `- ${c}`).join("\n") + "\n");
+  }
+  if (Array.isArray(obj.improvements_applied)) {
+    parts.push(`### Applied Optimizations\n` + obj.improvements_applied.map((i: string) => `- ⚡ ${i}`).join("\n") + "\n");
+  }
+  if (Array.isArray(obj.issues)) {
+    parts.push(`### Audit Issues & Validations\n` + obj.issues.map((iss: string) => `- 🛡️ ${iss}`).join("\n") + "\n");
+  }
+  if (Array.isArray(obj.recommendations)) {
+    parts.push(`### Strategic Recommendations\n` + obj.recommendations.map((r: string) => `- 🎯 ${r}`).join("\n") + "\n");
+  }
+  if (parts.length > 0) return parts.join("\n");
+  return JSON.stringify(obj, null, 2);
 }

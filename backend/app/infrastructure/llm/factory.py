@@ -115,6 +115,8 @@ class LLMProviderFactory:
 
     def _register_default_providers(self) -> None:
         """Ensure standard built-in providers are registered."""
+        if not self._registry.is_registered("omniroute"):
+            self._registry.register_class("omniroute", OpenAIProvider)
         if not self._registry.is_registered("openai"):
             self._registry.register_class("openai", OpenAIProvider)
         if not self._registry.is_registered("ollama"):

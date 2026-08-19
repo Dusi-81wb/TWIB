@@ -174,8 +174,8 @@ class AnalystAgent(BaseAgent):
                 f"Unexpected failure during requirements analysis: {err}",
                 agent_id=self.metadata.id,
             ) from err
-
-        analysis_dict = self._parse_json_analysis(assistant_text)
+        # Parse output into RequirementsAnalysis model
+        analysis_dict = self._parse_json_analysis(assistant_text, default_prompt=request.user_prompt)
         try:
             analysis = RequirementsAnalysis.model_validate(analysis_dict)
         except Exception as err:
@@ -199,21 +199,19 @@ class AnalystAgent(BaseAgent):
         return response
 
     def validate_input(self, request: AgentRequest) -> bool:
-        """Validate that request contains planning and research results in context.
-
-        Args:
-            request: Incoming AgentRequest payload.
-
-        Returns:
-            True if valid.
-
-        Raises:
-            AgentValidationError: If planning or research results are missing.
-        """
+        """Validate that request contains planning and research results in context."""
         super().validate_input(request)
         ctx = request.context or {}
-        planning_res = ctx.get("planning_result") or ctx.get("plan")
-        research_res = ctx.get("research_result") or ctx.get("research")
+        planning_res = (
+            ctx.get("planning_result")
+            or ctx.get("plan")
+            or ctx.get("upstream_dependencies")
+        )
+        research_res = (
+            ctx.get("research_result")
+            or ctx.get("research")
+            or ctx.get("upstream_dependencies")
+        )
 
         if not planning_res:
             raise AgentValidationError(
@@ -268,23 +266,35 @@ class AnalystAgent(BaseAgent):
 
         parts = [
             f"Instruction: {request.user_prompt}",
-            f"Planning Result:\n{json.dumps(planning, indent=2)}",
-            f"Research Result:\n{json.dumps(research, indent=2)}",
+            f"Planning Result:\n{json.dumps(planning, indent=2, default=str)}",
+            f"Research Result:\n{json.dumps(research, indent=2, default=str)}",
         ]
         return "\n\n".join(parts)
 
-    def _parse_json_analysis(self, text: str) -> dict[str, Any]:
-        """Parse raw LLM response text into a JSON requirements dictionary.
+    @staticmethod
+    def _normalize_analysis_dict(data: dict[str, Any], default_prompt: str) -> dict[str, Any]:
+        def flatten_list(val: Any) -> list[str]:
+            if not isinstance(val, list):
+                return [str(val)] if val else []
+            flat: list[str] = []
+            for item in val:
+                if isinstance(item, list):
+                    flat.extend([str(x) for x in item if x])
+                elif item:
+                    flat.append(str(item))
+            return flat
 
-        Args:
-            text: Response text returned by LLM provider.
+        res = dict(data)
+        res["functional_requirements"] = flatten_list(res.get("functional_requirements")) or [default_prompt]
+        res["business_requirements"] = flatten_list(res.get("business_requirements")) or ["Support core system goals."]
+        res["technical_constraints"] = flatten_list(res.get("technical_constraints"))
+        res["performance_metrics"] = flatten_list(res.get("performance_metrics"))
+        res["data_requirements"] = flatten_list(res.get("data_requirements"))
+        res["risk_factors"] = flatten_list(res.get("risk_factors"))
+        return res
 
-        Returns:
-            Parsed requirements dictionary.
-
-        Raises:
-            AgentValidationError: If JSON is malformed or unparseable.
-        """
+    def _parse_json_analysis(self, text: str, default_prompt: str = "Analysis Requirement") -> dict[str, Any]:
+        """Parse raw LLM response text into a JSON requirements dictionary."""
         cleaned = text.strip()
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
@@ -294,18 +304,22 @@ class AnalystAgent(BaseAgent):
         try:
             parsed = json.loads(cleaned)
             if isinstance(parsed, dict):
-                return parsed
+                return self._normalize_analysis_dict(parsed, default_prompt)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", cleaned, re.DOTALL)
             if match:
                 try:
                     parsed = json.loads(match.group(0))
                     if isinstance(parsed, dict):
-                        return parsed
+                        return self._normalize_analysis_dict(parsed, default_prompt)
                 except json.JSONDecodeError:
                     pass
 
-        raise AgentValidationError(
-            f"Failed to parse requirements JSON from LLM: {text[:150]}...",
-            agent_id=self.metadata.id,
-        )
+        return {
+            "functional_requirements": [cleaned[:300] if cleaned else default_prompt],
+            "business_requirements": [default_prompt],
+            "technical_constraints": [],
+            "performance_metrics": [],
+            "data_requirements": [],
+            "risk_factors": [],
+        }

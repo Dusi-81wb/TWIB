@@ -94,6 +94,8 @@ class WorkflowExecutor:
             agent_id=self._supervisor.metadata.id,
             user_prompt=workflow.user_request,
             context=merged_ctx,
+            model=merged_ctx.get("model"),
+            provider=merged_ctx.get("provider"),
         )
 
         step_start = datetime.now(UTC)
@@ -119,16 +121,18 @@ class WorkflowExecutor:
         new_steps: list[WorkflowStep] = []
         for raw_step in executed_steps:
             agent_id = raw_step.get("agent_id", "unknown")
+            node_id = raw_step.get("node_id")
             step_status = (
                 WorkflowStatus.COMPLETED
                 if raw_step.get("status") == AgentStatus.COMPLETED
                 else WorkflowStatus.FAILED
             )
+            step_name = f"Execute {agent_id.capitalize()} Node ({node_id})" if node_id else f"Execute {agent_id.capitalize()} Agent"
             step_obj = WorkflowStep(
-                name=f"Execute {agent_id.capitalize()} Agent",
+                name=step_name,
                 agent_id=agent_id,
                 status=step_status,
-                input_data={"objective": workflow.user_request},
+                input_data={"objective": workflow.user_request, "node_id": node_id},
                 output_data=raw_step.get("result"),
                 error=raw_step.get("error"),
                 started_at=step_start,
@@ -141,6 +145,10 @@ class WorkflowExecutor:
         workflow.metadata["total_duration_seconds"] = sup_dict.get(
             "total_duration_seconds"
         )
+        if "dag_plan" in sup_dict:
+            workflow.metadata["dag_plan"] = sup_dict["dag_plan"]
+        if "execution_graph" in sup_dict:
+            workflow.metadata["execution_graph"] = sup_dict["execution_graph"]
 
         if sup_res.status == AgentStatus.COMPLETED:
             workflow.mark_completed()

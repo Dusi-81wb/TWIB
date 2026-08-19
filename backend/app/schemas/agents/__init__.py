@@ -2,6 +2,7 @@
 
 from app.schemas.agents.agent_schemas import (
     AgentExecuteRequest,
+    AgentInfoResponse,
     CreateConversationRequest,
     ResearchConversationDetailResponse,
     ResearchConversationResponse,
@@ -13,6 +14,7 @@ from app.schemas.agents.agent_schemas import (
 
 __all__ = [
     "AgentExecuteRequest",
+    "AgentInfoResponse",
     "CreateConversationRequest",
     "ResearchConversationDetailResponse",
     "ResearchConversationResponse",

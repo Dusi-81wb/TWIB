@@ -26,15 +26,159 @@ export interface AIProviderItem {
   status: "connected" | "disconnected" | "error";
   default_model: string;
   is_default: boolean;
+  base_url?: string;
+}
+
+export interface OnboardingStatus {
+  onboarding_completed: boolean;
+  workspace_configured: boolean;
+  omniroute_configured: boolean;
+  default_model: string;
+  workspace_name?: string | null;
+  services_health: {
+    postgres?: string;
+    omniroute?: string;
+    redis?: string;
+    vector_store?: string;
+  };
+}
+
+export interface OnboardingCompletePayload {
+  workspace_name: string;
+  workspace_purpose?: string;
+  workspace_description?: string;
+  omniroute_api_key: string;
+  omniroute_base_url?: string;
+  default_model?: string;
+}
+
+export interface OmniRouteTestPayload {
+  api_key: string;
+  base_url?: string;
+  model?: string;
+}
+
+export interface OmniRouteTestResult {
+  success: boolean;
+  latency_ms: number;
+  message: string;
+  available_models: string[];
+}
+
+export interface OmniRouteConfig {
+  base_url: string;
+  default_model: string;
+  is_configured: boolean;
+  masked_api_key: string;
+}
+
+export interface DashboardMetrics {
+  total_workflows: number;
+  active_workflows: number;
+  running_workflows: number;
+  completed_workflows: number;
+  failed_workflows: number;
+  paused_workflows: number;
+  total_workspaces: number;
+  total_organizations: number;
+  total_agents: number;
+  recent_executions: Array<{
+    id: string;
+    agent_type: string;
+    status: string;
+    duration_seconds: number;
+    created_at: string;
+    prompt: string;
+  }>;
+  recent_workflows: Array<{
+    id: string;
+    name: string;
+    status: string;
+    created_at: string;
+    steps_count: number;
+    user_request: string;
+  }>;
+  services_status: {
+    postgres?: string;
+    omniroute?: string;
+    redis?: string;
+    vector_store?: string;
+  };
 }
 
 export const settingsService = {
+  // ----------------------------------------------------
+  // Onboarding & Gateway Setup
+  // ----------------------------------------------------
+  async getOnboardingStatus(): Promise<OnboardingStatus> {
+    const res = await apiClient.get("/settings/onboarding/status");
+    const data = unpackResponse<OnboardingStatus>(res.data);
+    return data;
+  },
+
+  async completeOnboarding(payload: OnboardingCompletePayload): Promise<{ success: boolean; message: string }> {
+    const res = await apiClient.post("/settings/onboarding/complete", payload);
+    const data = unpackResponse<{ success: boolean; message: string }>(res.data);
+    return data;
+  },
+
+  async testOmniRoute(payload: OmniRouteTestPayload): Promise<OmniRouteTestResult> {
+    const res = await apiClient.post("/settings/omniroute/test", payload);
+    const data = unpackResponse<OmniRouteTestResult>(res.data);
+    return data;
+  },
+
+  async getOmniRouteModels(): Promise<string[]> {
+    try {
+      const res = await apiClient.get("/settings/omniroute/models");
+      const models = unpackResponse<string[]>(res.data);
+      if (Array.isArray(models) && models.length > 0) {
+        return models;
+      }
+    } catch {
+      // Return standard model routing defaults
+    }
+    return [
+      "best-free",
+      "google/gemini-2.0-flash-exp:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "deepseek/deepseek-chat",
+      "gpt-4o",
+      "gpt-4o-mini",
+    ];
+  },
+
+  async getOmniRouteConfig(): Promise<OmniRouteConfig> {
+    const res = await apiClient.get("/settings/omniroute");
+    return unpackResponse<OmniRouteConfig>(res.data);
+  },
+
+  async updateOmniRouteConfig(payload: {
+    omniroute_api_key?: string;
+    omniroute_base_url?: string;
+    default_model?: string;
+  }): Promise<OmniRouteConfig> {
+    const res = await apiClient.put("/settings/omniroute", payload);
+    return unpackResponse<OmniRouteConfig>(res.data);
+  },
+
+  // ----------------------------------------------------
+  // Live Dashboard Metrics
+  // ----------------------------------------------------
+  async getDashboardMetrics(): Promise<DashboardMetrics> {
+    const res = await apiClient.get("/monitoring/dashboard");
+    return res.data as DashboardMetrics;
+  },
+
+  // ----------------------------------------------------
+  // API Keys Management
+  // ----------------------------------------------------
   async getApiKeys(workspaceId?: string): Promise<ApiKeyItem[]> {
     try {
       const url = workspaceId ? `/api-keys?workspace_id=${workspaceId}` : "/api-keys";
       const res = await apiClient.get(url);
       const keys = unpackResponse<any[]>(res.data);
-      if (Array.isArray(keys) && keys.length > 0) {
+      if (Array.isArray(keys)) {
         return keys.map((k) => ({
           id: k.id,
           name: k.name,
@@ -44,104 +188,59 @@ export const settingsService = {
         }));
       }
     } catch {
-      // Fallback
+      // Empty list on error
     }
-
-    return [
-      {
-        id: "key-cli",
-        name: "TWIB CLI Development Key",
-        key_prefix: "twib_live_...",
-        created_at: "2026-02-10",
-        last_used_at: "10 mins ago",
-      },
-      {
-        id: "key-prod",
-        name: "Production Pipeline Integration",
-        key_prefix: "twib_live_...",
-        created_at: "2026-01-20",
-        last_used_at: "1 hour ago",
-      },
-    ];
+    return [];
   },
 
   async createApiKey(payload: CreateApiKeyPayload): Promise<CreateApiKeyResponse> {
-    try {
-      const res = await apiClient.post("/api-keys", {
-        workspace_id: payload.workspace_id || "00000000-0000-0000-0000-000000000001",
-        name: payload.name,
-        environment: "live",
-      });
-      const data = unpackResponse<any>(res.data);
-      if (data && data.api_key) {
-        return {
-          id: data.id,
-          name: data.name,
-          key_prefix: data.prefix || data.key_prefix || "twib_live_...",
-          api_key: data.api_key,
-          created_at: data.created_at || new Date().toISOString(),
-        };
-      }
-    } catch {
-      // Fallback simulation
-    }
-
-    const rawKey = `twib_live_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-    return {
-      id: `key-${Date.now()}`,
+    const res = await apiClient.post("/api-keys", {
+      workspace_id: payload.workspace_id || "00000000-0000-0000-0000-000000000001",
       name: payload.name,
-      key_prefix: rawKey.slice(0, 12) + "...",
-      api_key: rawKey,
-      created_at: new Date().toISOString(),
-    };
+      environment: "live",
+    });
+    const data = unpackResponse<any>(res.data);
+    if (data && data.api_key) {
+      return {
+        id: data.id,
+        name: data.name,
+        key_prefix: data.prefix || data.key_prefix || "twib_live_...",
+        api_key: data.api_key,
+        created_at: data.created_at || new Date().toISOString(),
+      };
+    }
+    throw new Error("Failed to generate API Key");
   },
 
   async revokeApiKey(keyId: string): Promise<void> {
-    try {
-      await apiClient.delete(`/api-keys/${keyId}`);
-    } catch {
-      // Fallback
-    }
+    await apiClient.delete(`/api-keys/${keyId}`);
   },
 
+  // ----------------------------------------------------
+  // AI Providers Overview
+  // ----------------------------------------------------
   async getAIProviders(): Promise<AIProviderItem[]> {
     try {
-      const res = await apiClient.get("/monitoring/health");
-      const data = unpackResponse<any>(res.data);
-      if (data) {
-        return [
-          {
-            name: "OpenAI",
-            status: "connected",
-            default_model: "gpt-4o",
-            is_default: true,
-          },
-          {
-            name: "Ollama (Local LLM)",
-            status: "connected",
-            default_model: "llama3:8b",
-            is_default: false,
-          },
-        ];
-      }
+      const cfg = await this.getOmniRouteConfig();
+      return [
+        {
+          name: "OmniRoute LLM Gateway",
+          status: cfg.is_configured ? "connected" : "disconnected",
+          default_model: cfg.default_model || "best-free",
+          is_default: true,
+          base_url: cfg.base_url,
+        },
+      ];
     } catch {
-      // Fallback
+      return [
+        {
+          name: "OmniRoute LLM Gateway",
+          status: "disconnected",
+          default_model: "best-free",
+          is_default: true,
+        },
+      ];
     }
-
-    return [
-      {
-        name: "OpenAI",
-        status: "connected",
-        default_model: "gpt-4o",
-        is_default: true,
-      },
-      {
-        name: "Ollama (Local LLM)",
-        status: "connected",
-        default_model: "llama3:8b",
-        is_default: false,
-      },
-    ];
   },
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {

@@ -16,7 +16,7 @@ interface StatusHeaderProps {
 
 export function StatusHeader({
   provider = "omniroute",
-  model = "best-fast",
+  model = "Auto-detected",
   latencyMs,
   tokens,
   onRefreshHealth,
@@ -46,8 +46,8 @@ export function StatusHeader({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
-          <span className="font-semibold text-emerald-500 text-[11px] flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> OmniRoute Connected
+          <span className="font-semibold text-emerald-400 text-[11px] flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Gateway Online
           </span>
         </div>
 
@@ -56,7 +56,7 @@ export function StatusHeader({
         <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
           <Zap className="h-3.5 w-3.5 text-primary" />
           <span className="text-foreground font-semibold uppercase tracking-wider text-[11px]">
-            {provider}
+            {provider || "Universal Proxy"}
           </span>
         </div>
 

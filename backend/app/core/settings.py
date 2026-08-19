@@ -62,6 +62,12 @@ class ApplicationSettings(BaseSettings):
     omniroute_base_url: str = "http://localhost:8080/v1"
     omniroute_api_key: str = ""
     default_model: str = "gpt-4o"
+    # Supabase Configuration
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""
+    supabase_storage_bucket: str = "workflow-artifacts"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
@@ -74,10 +80,15 @@ class ApplicationSettings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def assemble_database_url(cls, v: Any) -> str:
-        """Fallback to sqlite+aiosqlite when database_url is empty."""
+        """Fallback to sqlite+aiosqlite when database_url is empty, or normalize postgresql driver."""
         if not v or not isinstance(v, str) or not v.strip():
             return "sqlite+aiosqlite:///./twib.db"
-        return v.strip()
+        url = v.strip()
+        if url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + url[len("postgres://"):]
+        if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            return "postgresql+asyncpg://" + url[len("postgresql://"):]
+        return url
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -156,13 +156,19 @@ class ApplicationContainer(containers.DeclarativeContainer):
     supervisor_agent = providers.Factory(
         SupervisorAgent,
         llm_factory=llm_provider_factory,
+        llm_gateway=llm_gateway,
+        settings=settings,
     )
     workflow_event_publisher = providers.Singleton(WorkflowEventPublisher)
     websocket_manager = providers.Singleton(WebSocketManager)
-    workflow_engine = providers.Singleton(WorkflowEngine)
+    workflow_engine = providers.Singleton(
+        WorkflowEngine,
+        supervisor_agent=supervisor_agent,
+    )
     workflow_executor = providers.Singleton(
         WorkflowExecutor,
         engine=workflow_engine,
+        supervisor_agent=supervisor_agent,
     )
     workflow_state_manager = providers.Singleton(
         WorkflowStateManager,
@@ -182,6 +188,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
         engine=workflow_engine,
         llm_factory=llm_provider_factory,
         monitor=workflow_monitor,
+        llm_gateway=llm_gateway,
+        redis_client=redis_client,
+        vector_client=vector_client,
     )
     approval_manager = providers.Singleton(
         ApprovalManager,

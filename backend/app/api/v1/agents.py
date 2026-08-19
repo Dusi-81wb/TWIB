@@ -13,6 +13,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.agent_dag import AgentDAGPlan, DAGExecutionResult
 from app.agents.analyst_agent import AnalystAgent
 from app.agents.architect_agent import ArchitectAgent
 from app.agents.base_agent import BaseAgent
@@ -55,6 +56,7 @@ from app.infrastructure.repositories.research_execution_repository import (
 )
 from app.schemas.agents import (
     AgentExecuteRequest,
+    AgentInfoResponse,
     CreateConversationRequest,
     ResearchConversationDetailResponse,
     ResearchConversationResponse,
@@ -69,6 +71,84 @@ from app.services.audit.audit_service import AuditService
 logger = structlog.get_logger(__name__)
 
 agents_router = APIRouter(prefix="/agents", tags=[AGENTS], responses=COMMON_RESPONSES)
+
+
+@agents_router.get(
+    "",
+    response_model=SuccessResponse[list[AgentInfoResponse]],
+    status_code=status.HTTP_200_OK,
+    summary="List Registered Agents",
+    description="Fetch list of all 8 specialized registered AI agents in TWIB.",
+)
+async def list_agents() -> SuccessResponse[list[AgentInfoResponse]]:
+    """Return all registered specialized AI agents."""
+    agents_list = [
+        AgentInfoResponse(
+            id="planner",
+            name="PlannerAgent",
+            type="planner",
+            role="Planning & Task Decomposition",
+            description="Decomposes complex human requests into structured, actionable execution plans.",
+            capabilities=["Task Decomposition", "Dependency Mapping", "Execution Strategy"],
+        ),
+        AgentInfoResponse(
+            id="research",
+            name="ResearchAgent",
+            type="research",
+            role="Intelligence & Data Gathering",
+            description="Gathers external documentation, API references, and domain knowledge.",
+            capabilities=["Web Search", "API Scraping", "Knowledge Retrieval"],
+        ),
+        AgentInfoResponse(
+            id="analyst",
+            name="AnalystAgent",
+            type="analyst",
+            role="Data & Requirements Analysis",
+            description="Analyzes numerical data, system requirements, and constraint trade-offs.",
+            capabilities=["Constraint Evaluation", "Metric Sizing", "Trade-Off Analysis"],
+        ),
+        AgentInfoResponse(
+            id="architect",
+            name="ArchitectAgent",
+            type="architect",
+            role="Software Architecture Design",
+            description="Designs system architecture, component contracts, and database schemas.",
+            capabilities=["System Design", "API Contract Spec", "Database Modeling"],
+        ),
+        AgentInfoResponse(
+            id="validator",
+            name="ValidatorAgent",
+            type="validator",
+            role="Validation & Testing",
+            description="Validates code design, security policies, and test suite compliance.",
+            capabilities=["OWASP Security Audit", "Contract Validation", "Edge-case Testing"],
+        ),
+        AgentInfoResponse(
+            id="optimizer",
+            name="OptimizerAgent",
+            type="optimizer",
+            role="Performance & Refactoring",
+            description="Optimizes execution efficiency, latency bottlenecks, and code refactoring.",
+            capabilities=["Performance Tuning", "Latency Reduction", "Code Refactoring"],
+        ),
+        AgentInfoResponse(
+            id="documentation",
+            name="DocumentationAgent",
+            type="documentation",
+            role="Documentation & Artifacts",
+            description="Generates comprehensive markdown documentation, walkthroughs, and OpenAPI specs.",
+            capabilities=["Markdown Generation", "API Spec Authoring", "Walkthrough Docs"],
+        ),
+        AgentInfoResponse(
+            id="supervisor",
+            name="SupervisorAgent",
+            type="supervisor",
+            role="Pipeline Orchestration",
+            description="Orchestrates multi-agent pipelines, manages state, and monitors execution.",
+            capabilities=["Pipeline Control", "State Transition", "Error Recovery"],
+        ),
+    ]
+    return SuccessResponse[list[AgentInfoResponse]](data=agents_list)
 
 
 def _parse_user_id(claims: dict[str, Any]) -> str | None:
@@ -707,3 +787,55 @@ async def execute_supervisor(
 ) -> AgentResponse:
     """Orchestrate multi-agent workflow pipelines."""
     return await _execute_agent_helper(agent, "supervisor", body, audit_service, claims)
+
+
+@agents_router.post(
+    "/plan-dag",
+    response_model=AgentDAGPlan,
+    summary="Plan Dynamic Multi-Agent DAG",
+    description="Generate an adaptive Directed Acyclic Graph (DAG) plan for multi-agent workflow execution.",
+)
+async def plan_dag(
+    body: AgentExecuteRequest,
+    agent: SupervisorAgent = Depends(get_supervisor_agent),
+) -> AgentDAGPlan:
+    """Plan an adaptive DAG for multi-agent orchestration."""
+    try:
+        return await agent.plan_dag(
+            goal=body.user_prompt,
+            context=body.context,
+            provider=body.provider,
+            model=body.model,
+        )
+    except AgentValidationError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": str(err), "agent_id": "supervisor"},
+        ) from err
+    except Exception as err:
+        logger.error("DAG planning failed: %s", err)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"DAG planning failed: {err}",
+        ) from err
+
+
+@agents_router.post(
+    "/supervisor/dag",
+    response_model=AgentResponse,
+    summary="Execute Dynamic Multi-Agent DAG",
+    description="Execute a dynamic DAG multi-agent workflow with concurrent topological dispatch.",
+)
+async def execute_supervisor_dag(
+    body: AgentExecuteRequest,
+    agent: SupervisorAgent = Depends(get_supervisor_agent),
+    audit_service: AuditService = Depends(get_audit_service),
+    claims: dict[str, Any] = Depends(get_current_user_claims),
+) -> AgentResponse:
+    """Execute dynamic DAG multi-agent pipeline."""
+    # Force dynamic routing flag in context
+    ctx = dict(body.context or {})
+    ctx["dynamic_routing"] = True
+    body.context = ctx
+    return await _execute_agent_helper(agent, "supervisor", body, audit_service, claims)
+

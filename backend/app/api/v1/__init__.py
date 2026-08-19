@@ -10,6 +10,7 @@ from app.api.v1.health import health_router
 from app.api.v1.invitations import invitations_router
 from app.api.v1.monitoring import monitoring_router
 from app.api.v1.organizations import organizations_router
+from app.api.v1.settings import settings_router
 from app.api.v1.users import users_router
 from app.api.v1.websockets import websockets_router
 from app.api.v1.workflows import workflows_router
@@ -29,5 +30,6 @@ api_v1_router.include_router(workflows_router)
 api_v1_router.include_router(agents_router)
 api_v1_router.include_router(websockets_router)
 api_v1_router.include_router(monitoring_router)
+api_v1_router.include_router(settings_router)
 
 __all__ = ["api_v1_router"]

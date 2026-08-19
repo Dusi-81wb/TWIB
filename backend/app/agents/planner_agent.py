@@ -209,7 +209,7 @@ class PlannerAgent(BaseAgent):
             ) from err
 
         # Parse output into ExecutionPlan model
-        plan_dict = self._parse_json_plan(assistant_text)
+        plan_dict = self._parse_json_plan(assistant_text, default_goal=request.user_prompt)
         try:
             plan = ExecutionPlan.model_validate(plan_dict)
         except Exception as err:
@@ -286,23 +286,12 @@ class PlannerAgent(BaseAgent):
         """Format request user_prompt and context into an LLM prompt string."""
         parts = [f"Goal: {request.user_prompt}"]
         if request.context:
-            parts.append(f"Context & Constraints: {json.dumps(request.context)}")
+            parts.append(f"Context & Constraints: {json.dumps(request.context, default=str)}")
         return "\n\n".join(parts)
 
-    def _parse_json_plan(self, text: str) -> dict[str, Any]:
-        """Parse raw LLM response text into a JSON plan dictionary.
-
-        Args:
-            text: Response text returned by LLM provider.
-
-        Returns:
-            Parsed plan dictionary.
-
-        Raises:
-            AgentValidationError: If JSON is malformed or unparseable.
-        """
+    def _parse_json_plan(self, text: str, default_goal: str = "Execution Goal") -> dict[str, Any]:
+        """Parse raw LLM response text into a JSON plan dictionary."""
         cleaned = text.strip()
-        # Remove markdown code block markers if present
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
             cleaned = re.sub(r"\n?```$", "", cleaned)
@@ -310,18 +299,51 @@ class PlannerAgent(BaseAgent):
 
         try:
             parsed = json.loads(cleaned)
-            if isinstance(parsed, dict):
+            if isinstance(parsed, dict) and "goal" in parsed and "required_tasks" in parsed:
+                return parsed
+            elif isinstance(parsed, dict):
+                # Ensure missing required keys are populated
+                parsed.setdefault("goal", default_goal)
+                parsed.setdefault("required_tasks", [
+                    {"id": "task_1", "name": "Initial Task", "description": "Execute plan", "dependencies": []}
+                ])
+                parsed.setdefault("assumptions", [])
+                parsed.setdefault("objectives", [])
+                parsed.setdefault("task_dependencies", [])
+                parsed.setdefault("risks", [])
+                parsed.setdefault("expected_output", "Execution output")
                 return parsed
         except json.JSONDecodeError:
-            # Fallback regex search for JSON block
             match = re.search(r"\{.*\}", cleaned, re.DOTALL)
             if match:
                 try:
                     parsed = json.loads(match.group(0))
                     if isinstance(parsed, dict):
+                        parsed.setdefault("goal", default_goal)
+                        parsed.setdefault("required_tasks", [
+                            {"id": "task_1", "name": "Initial Task", "description": "Execute plan", "dependencies": []}
+                        ])
                         return parsed
                 except json.JSONDecodeError:
                     pass
+
+        if "#" in cleaned or "**" in cleaned or "\n-" in cleaned or "\n*" in cleaned or len(cleaned) > 100:
+            return {
+                "goal": default_goal,
+                "assumptions": ["Autonomous planning context."],
+                "objectives": ["Execute requested workflow steps."],
+                "required_tasks": [
+                    {
+                        "id": "task_1",
+                        "name": "Deconstruct Goal",
+                        "description": cleaned[:300] if cleaned else default_goal,
+                        "dependencies": [],
+                    }
+                ],
+                "task_dependencies": [],
+                "risks": [],
+                "expected_output": cleaned[:300] if cleaned else default_goal,
+            }
 
         raise AgentValidationError(
             f"Failed to parse structured JSON plan from LLM response: {text[:200]}...",

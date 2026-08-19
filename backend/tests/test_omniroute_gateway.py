@@ -211,3 +211,97 @@ async def test_di_container_llm_gateway_resolution(
     assert isinstance(gateway, OmniRouteGateway)
     assert gateway.base_url == "http://localhost:8080/v1"
     assert gateway.default_model == "gpt-4o"
+
+
+@pytest.mark.asyncio
+async def test_lm_studio_endpoint_and_model_resolution_regression() -> None:
+    """Regression test: verify LM Studio base URL without /v1 produces /v1/chat/completions,
+    does NOT produce /chat/completions or /v1/v1/chat/completions, and does NOT overwrite
+    model with 'default' or prefix with 'auto/'.
+    """
+    settings = ApplicationSettings(
+        omniroute_base_url="http://127.0.0.1:1234",
+        omniroute_api_key="",
+        default_model="qwen3.5-4b-uncensored-hauhaucs-aggressive",
+    )
+
+    recorded_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        recorded_requests.append(request)
+        assert request.url.path == "/v1/chat/completions"
+        assert request.url.path != "/chat/completions"
+        assert request.url.path != "/v1/v1/chat/completions"
+
+        body = request.read().decode("utf-8")
+        assert "qwen3.5-4b-uncensored-hauhaucs-aggressive" in body
+        assert '"model": "default"' not in body
+        assert "auto/qwen" not in body
+
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-lmstudio",
+                "object": "chat.completion",
+                "model": "qwen3.5-4b-uncensored-hauhaucs-aggressive",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "LM Studio Qwen model response.",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 8,
+                    "total_tokens": 20,
+                },
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        gateway = OmniRouteGateway(settings=settings, http_client=http_client)
+
+        # 1. Test base_url without trailing /v1
+        res = await gateway.chat(
+            [ChatMessage(role=MessageRole.USER, content="Research India")],
+            model="qwen3.5-4b-uncensored-hauhaucs-aggressive",
+        )
+        assert res.answer == "LM Studio Qwen model response."
+        assert res.model == "qwen3.5-4b-uncensored-hauhaucs-aggressive"
+        assert res.provider == "lm_studio"
+        assert len(recorded_requests) == 1
+
+        # 2. Test base_url with trailing /v1
+        settings.omniroute_base_url = "http://127.0.0.1:1234/v1"
+        res2 = await gateway.chat(
+            [ChatMessage(role=MessageRole.USER, content="Explain quantum physics")],
+            model="qwen3.5-4b-uncensored-hauhaucs-aggressive",
+        )
+        assert res2.answer == "LM Studio Qwen model response."
+        assert len(recorded_requests) == 2
+        assert recorded_requests[1].url.path == "/v1/chat/completions"
+
+
+@pytest.mark.asyncio
+async def test_dynamic_settings_update_in_gateway() -> None:
+    """Verify that updating settings.omniroute_base_url updates OmniRouteGateway immediately."""
+    settings = ApplicationSettings(
+        omniroute_base_url="http://localhost:8080/v1",
+        default_model="best-free",
+    )
+    gateway = OmniRouteGateway(settings=settings)
+    assert gateway.base_url == "http://localhost:8080/v1"
+
+    # Mutate settings at runtime
+    settings.omniroute_base_url = "http://127.0.0.1:1234/v1"
+    settings.default_model = "qwen3.5-4b-uncensored-hauhaucs-aggressive"
+
+    assert gateway.base_url == "http://127.0.0.1:1234/v1"
+    assert gateway.default_model == "qwen3.5-4b-uncensored-hauhaucs-aggressive"
+    assert gateway.provider_name == "lm_studio"
+

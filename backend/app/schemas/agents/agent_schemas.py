@@ -12,6 +12,20 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class AgentInfoResponse(BaseModel):
+    """Transport schema for describing registered agent capabilities."""
+
+    id: str = Field(..., description="Agent identifier string.")
+    name: str = Field(..., description="Display name of agent.")
+    type: str = Field(..., description="Type key of agent.")
+    role: str = Field(..., description="Primary role declaration.")
+    description: str = Field(..., description="Detailed description.")
+    capabilities: list[str] = Field(
+        default_factory=list,
+        description="Capabilities list.",
+    )
+
+
 class AgentExecuteRequest(BaseModel):
     """Transport schema for executing an AI Agent."""
 
@@ -58,12 +72,10 @@ class ResearchRunRequest(BaseModel):
         description="Sampling temperature for LLM completion.",
         examples=[0.3],
     )
-    model: str = Field(
-        default="best-fast",
-        min_length=1,
+    model: str | None = Field(
+        default=None,
         max_length=255,
-        description="Target model identifier.",
-        examples=["best-fast"],
+        description="Target model identifier (optional, auto-routes to configured/loaded model if omitted).",
     )
 
 
@@ -113,11 +125,10 @@ class SendMessageRequest(BaseModel):
         le=2.0,
         description="Sampling temperature for completion.",
     )
-    model: str = Field(
-        default="best-fast",
-        min_length=1,
+    model: str | None = Field(
+        default=None,
         max_length=255,
-        description="Target model identifier.",
+        description="Target model identifier (optional, auto-routes to configured/loaded model if omitted).",
     )
 
 

@@ -144,3 +144,18 @@ async def get_unified_metrics_report(
 ) -> UnifiedMetricsReport:
     """Retrieve unified report combining health, workflow, and agent metrics."""
     return await monitoring_service.get_unified_metrics()
+
+
+@monitoring_router.get(
+    "/dashboard",
+    summary="Get live production dashboard metrics",
+)
+async def get_dashboard_metrics(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    claims: dict[str, Any] = Depends(get_current_user_claims),
+) -> dict[str, Any]:
+    """Retrieve live aggregated metrics across workflows, executions, workspaces, and system health."""
+    from app.infrastructure.database.session import session_factory
+    user_id = _parse_user_id(claims)
+    async with session_factory()() as session:
+        return await monitoring_service.get_dashboard_summary(session=session, user_id=user_id)

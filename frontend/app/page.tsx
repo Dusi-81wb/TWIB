@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { settingsService } from "@/services/settings.service";
 
 export default function RootPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -11,7 +12,18 @@ export default function RootPage() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        router.replace("/dashboard");
+        settingsService
+          .getOnboardingStatus()
+          .then((res) => {
+            if (res && res.onboarding_completed) {
+              router.replace("/dashboard");
+            } else {
+              router.replace("/onboarding");
+            }
+          })
+          .catch(() => {
+            router.replace("/dashboard");
+          });
       } else {
         router.replace("/login");
       }

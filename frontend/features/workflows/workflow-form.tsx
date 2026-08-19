@@ -8,13 +8,16 @@ import { useRouter } from "next/navigation";
 import { workflowService, WorkflowTemplateItem } from "@/services/workflow.service";
 import { TemplateSelector } from "./template-selector";
 import { PipelinePreview } from "./pipeline-preview";
+import { DynamicDAGBuilder } from "./dynamic-dag-builder";
 import { ExecutionOptions } from "./execution-options";
 import { WorkflowSummary } from "./workflow-summary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, Play, FileCheck } from "lucide-react";
+import { Loader2, AlertCircle, Play, FileCheck, Sparkles, Layers } from "lucide-react";
+import { AgentDAGPlan } from "@/types/dag";
+import { cn } from "@/lib/utils";
 
 const workflowBuilderSchema = z.object({
   workflow_name: z.string().min(2, "Workflow name must be at least 2 characters"),
@@ -31,6 +34,8 @@ export function WorkflowForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [selectedTemplateName, setSelectedTemplateName] = useState<string>("Custom / No Template");
+  const [isDynamicDAG, setIsDynamicDAG] = useState<boolean>(true);
+  const [dagPlan, setDagPlan] = useState<AgentDAGPlan | null>(null);
 
   const router = useRouter();
 
@@ -161,8 +166,47 @@ export function WorkflowForm() {
         )}
       </div>
 
-      {/* Section 4: Pipeline Preview */}
-      <PipelinePreview />
+      {/* Section 4: Execution Architecture & DAG Mode */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Multi-Agent Architecture Mode
+          </Label>
+          <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border bg-muted/40 text-xs">
+            <button
+              type="button"
+              onClick={() => setIsDynamicDAG(true)}
+              className={cn(
+                "px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 font-medium",
+                isDynamicDAG ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Dynamic DAG Flow
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDynamicDAG(false)}
+              className={cn(
+                "px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 font-medium",
+                !isDynamicDAG ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Fixed Pipeline
+            </button>
+          </div>
+        </div>
+
+        {isDynamicDAG ? (
+          <DynamicDAGBuilder
+            initialGoal={watchedValues.user_request}
+            onPlanChange={(plan) => setDagPlan(plan)}
+          />
+        ) : (
+          <PipelinePreview />
+        )}
+      </div>
 
       {/* Section 5: Execution Control Options */}
       <ExecutionOptions

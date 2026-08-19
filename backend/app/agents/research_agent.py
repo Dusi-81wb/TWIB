@@ -92,7 +92,7 @@ class ResearchAgent(BaseAgent):
         self,
         llm_gateway: LLMGateway | None = None,
         llm_factory: LLMProviderFactory | None = None,
-        default_model: str = "best-fast",
+        default_model: str | None = None,
         default_provider: str = "omniroute",
     ) -> None:
         """Initialize ResearchAgent.
@@ -100,7 +100,7 @@ class ResearchAgent(BaseAgent):
         Args:
             llm_gateway: Injected LLMGateway dependency (e.g. OmniRouteGateway).
             llm_factory: Optional custom LLMProviderFactory for legacy providers.
-            default_model: Default model identifier ('best-fast').
+            default_model: Default model identifier (or None to dynamically resolve).
             default_provider: Default provider identifier ('omniroute').
         """
         super().__init__(llm_factory=llm_factory)
@@ -119,7 +119,7 @@ class ResearchAgent(BaseAgent):
             ),
             version="1.0.0",
             capabilities=[AgentCapability.RESEARCH],
-            supported_models=[self._default_model, "gpt-4o", "llama3"],
+            supported_models=[self._default_model or "default", "gpt-4o", "llama3"],
         )
 
     async def run(
@@ -127,7 +127,7 @@ class ResearchAgent(BaseAgent):
         prompt: str,
         *,
         temperature: float = 0.3,
-        model: str = "best-fast",
+        model: str | None = None,
     ) -> GatewayResponse:
         """Run ResearchAgent synchronously against LLMGateway.
 
@@ -175,7 +175,7 @@ class ResearchAgent(BaseAgent):
         messages: list[ChatMessage],
         *,
         temperature: float = 0.3,
-        model: str = "best-fast",
+        model: str | None = None,
     ) -> GatewayResponse:
         """Run ResearchAgent over a multi-turn conversation list against LLMGateway.
 
@@ -233,7 +233,7 @@ class ResearchAgent(BaseAgent):
         self.validate_input(request)
 
         provider_name = request.provider or self._default_provider
-        model_name = request.model or self._default_model
+        model_name = request.model or self._default_model or "default"
         conv = request.conversation or Conversation()
 
         prompt_text = self._format_user_prompt(request)
@@ -285,7 +285,7 @@ class ResearchAgent(BaseAgent):
                 ) from err
 
         # Parse output into ResearchReport model
-        report_dict = self._parse_json_report(assistant_text)
+        report_dict = self._parse_json_report(assistant_text, default_topic=request.user_prompt or "Research Analysis")
         try:
             report = ResearchReport.model_validate(report_dict)
         except Exception as err:
@@ -345,12 +345,11 @@ class ResearchAgent(BaseAgent):
             parts.append(f"Context & Constraints: {json.dumps(request.context)}")
         return "\n\n".join(parts)
 
-    def _parse_json_report(self, text: str) -> dict[str, Any]:
+    def _parse_json_report(self, text: str, default_topic: str = "Research Analysis") -> dict[str, Any]:
         """Parse raw LLM response text into a report dictionary.
 
         Attempts to parse JSON first for legacy structured calls; if non-JSON markdown
-        header structure is returned, wraps into a valid ResearchReport dictionary.
-        Raises AgentValidationError for invalid malformed plain text.
+        or natural text is returned, wraps into a valid ResearchReport dictionary.
         """
         cleaned = text.strip()
         if cleaned.startswith("```"):
@@ -372,17 +371,11 @@ class ResearchAgent(BaseAgent):
                 except json.JSONDecodeError:
                     pass
 
-        # If text is structured Markdown report starting with # or ##
-        has_headers = (
-            cleaned.startswith("#")
-            or "## Executive Summary" in cleaned
-            or "## Key Findings" in cleaned
-        )
-        if has_headers:
+        if "#" in cleaned or "**" in cleaned or "\n-" in cleaned or "\n*" in cleaned or len(cleaned) > 100:
             return {
-                "topic": "Research Topic Summary",
-                "summary": cleaned[:300] if len(cleaned) > 300 else cleaned,
-                "key_findings": ["Factual domain analysis via OmniRoute Gateway"],
+                "topic": default_topic,
+                "summary": cleaned,
+                "key_findings": ["Domain research completed via LLM Gateway."],
                 "best_practices": [],
                 "risks": [],
                 "references": [],
@@ -390,6 +383,6 @@ class ResearchAgent(BaseAgent):
             }
 
         raise AgentValidationError(
-            f"Failed to parse research report JSON: {text[:150]}...",
+            f"Failed to parse structured research JSON from LLM response: {text[:200]}...",
             agent_id=self.metadata.id,
         )

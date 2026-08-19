@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface DashboardCardProps {
@@ -18,15 +17,20 @@ export function DashboardCard({
   className,
 }: DashboardCardProps) {
   return (
-    <Card className={cn("border-border/80 shadow-sm", className)}>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <div className="space-y-1">
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
-          {description && <CardDescription>{description}</CardDescription>}
+    <div
+      className={cn(
+        "rounded-2xl glass-panel border border-white/10 p-5 shadow-lg space-y-4 transition-all duration-300 hover:border-white/20",
+        className
+      )}
+    >
+      <div className="flex items-center justify-between gap-4 pb-1 border-b border-border/40">
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-bold tracking-tight text-foreground">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        {action && <div>{action}</div>}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div>{children}</div>
+    </div>
   );
 }

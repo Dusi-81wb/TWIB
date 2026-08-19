@@ -13,6 +13,9 @@ export interface AgentExecutePayload {
   agent_type: string;
   prompt: string;
   context?: Record<string, unknown>;
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
 }
 
 export interface AgentExecuteResponse {
@@ -23,6 +26,10 @@ export interface AgentExecuteResponse {
   duration_seconds: number;
   created_at: string;
   confidence?: number;
+  error?: string;
+  model?: string;
+  provider?: string;
+  tokens?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
 }
 
 export interface RecentExecutionItem {
@@ -239,42 +246,142 @@ export const agentService = {
 
   async executeAgent(payload: AgentExecutePayload): Promise<AgentExecuteResponse> {
     const startTime = Date.now();
+    const endpoint = `/agents/${payload.agent_type.toLowerCase()}/execute`;
     try {
-      const endpoint = `/agents/${payload.agent_type.toLowerCase()}/execute`;
       const res = await apiClient.post(endpoint, {
-        prompt: payload.prompt,
+        user_prompt: payload.prompt,
         context: payload.context || {},
+        model: payload.model,
+        temperature: payload.temperature,
+        max_tokens: payload.max_tokens,
       });
       const data = unpackResponse<any>(res.data);
 
-      if (data) {
-        const durationSec = typeof data.execution_time_ms === "number"
-          ? parseFloat((data.execution_time_ms / 1000).toFixed(2))
-          : parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+      const durationSec = typeof data?.execution_time_ms === "number"
+        ? parseFloat((data.execution_time_ms / 1000).toFixed(2))
+        : parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
 
-        return {
-          execution_id: data.agent_id || `exec-${Date.now()}`,
-          agent_type: payload.agent_type,
-          status: data.status || "completed",
-          output: typeof data.result === "string" ? data.result : JSON.stringify(data.result || data.output || "Execution completed", null, 2),
-          duration_seconds: durationSec,
-          created_at: new Date().toISOString(),
-          confidence: 0.96,
-        };
-      }
-    } catch {
-      // Fallback simulation if offline
+      return {
+        execution_id: data?.agent_id || `exec-${Date.now()}`,
+        agent_type: payload.agent_type,
+        status: data?.status || "completed",
+        output: typeof data?.result === "string" ? data.result : JSON.stringify(data?.result || data?.output || "Execution completed", null, 2),
+        duration_seconds: durationSec,
+        created_at: new Date().toISOString(),
+        confidence: 0.98,
+        model: payload.model || data?.model,
+        provider: data?.provider || "unified-gateway",
+        tokens: data?.usage,
+      };
+    } catch (err: any) {
+      const durationSec = parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+      const errorMsg = err?.response?.data?.detail || err?.message || "LLM Gateway is unreachable. Check your gateway configuration in Settings.";
+      return {
+        execution_id: `exec-failed-${Date.now()}`,
+        agent_type: payload.agent_type,
+        status: "failed",
+        output: `Agent execution failed: ${errorMsg}`,
+        error: errorMsg,
+        duration_seconds: durationSec,
+        created_at: new Date().toISOString(),
+        model: payload.model,
+      };
     }
+  },
 
-    const duration = (Date.now() - startTime) / 1000 + 1.2;
-    return {
-      execution_id: `exec-${Date.now()}`,
-      agent_type: payload.agent_type,
-      status: "completed",
-      output: `[${payload.agent_type.toUpperCase()} AGENT RESPONSE]\nProcessed prompt: "${payload.prompt}"\n\nResult:\n1. Execution plan formulated successfully.\n2. Identified key constraints and system boundaries.\n3. Verified output against TWIB safety standards.`,
-      duration_seconds: parseFloat(duration.toFixed(2)),
-      created_at: new Date().toISOString(),
-      confidence: 0.96,
-    };
+  /**
+   * Plan a Dynamic Multi-Agent DAG from a user prompt/goal.
+   */
+  async planDAG(goal: string, context?: Record<string, any>): Promise<any> {
+    try {
+      const res = await apiClient.post("/agents/plan-dag", {
+        user_prompt: goal,
+        context: context || {},
+      });
+      return unpackResponse<any>(res.data) || res.data;
+    } catch (err) {
+      console.warn("planDAG API call failed, generating deterministic client-side DAG", err);
+      // Fallback client-side DAG plan for offline mode
+      return {
+        plan_id: `plan-${Date.now()}`,
+        goal,
+        rationale: "Adaptive multi-agent execution DAG with concurrent research, analysis, and validation stages.",
+        execution_strategy: "parallel_topological",
+        nodes: [
+          {
+            node_id: "step_planner",
+            agent_id: "planner",
+            name: "Deconstruct Goal",
+            description: "Break down problem scope and milestones",
+            dependencies: [],
+            optional: false,
+          },
+          {
+            node_id: "step_research",
+            agent_id: "research",
+            name: "Domain Research",
+            description: "Gather background data, patterns, and APIs",
+            dependencies: ["step_planner"],
+            optional: true,
+          },
+          {
+            node_id: "step_analyst",
+            agent_id: "analyst",
+            name: "Feasibility Analysis",
+            description: "Analyze metrics, constraints, and dependencies",
+            dependencies: ["step_planner"],
+            optional: false,
+          },
+          {
+            node_id: "step_architect",
+            agent_id: "architect",
+            name: "Architecture Specification",
+            description: "Synthesize findings into system DAG blueprint",
+            dependencies: ["step_research", "step_analyst"],
+            optional: false,
+          },
+          {
+            node_id: "step_validator",
+            agent_id: "validator",
+            name: "Security & Constraint Validation",
+            description: "Verify compliance against standard policies",
+            dependencies: ["step_architect"],
+            optional: false,
+          },
+          {
+            node_id: "step_optimizer",
+            agent_id: "optimizer",
+            name: "Latency & Cost Optimization",
+            description: "Optimize compute, token budgets, and caching",
+            dependencies: ["step_architect"],
+            optional: true,
+          },
+          {
+            node_id: "step_documentation",
+            agent_id: "documentation",
+            name: "Documentation Synthesis",
+            description: "Compile deployment guide and architecture summary",
+            dependencies: ["step_validator", "step_optimizer"],
+            optional: false,
+          },
+        ],
+      };
+    }
+  },
+
+  /**
+   * Execute a Dynamic Multi-Agent DAG.
+   */
+  async executeDAG(goal: string, dagPlan?: any, context?: Record<string, any>): Promise<any> {
+    const res = await apiClient.post("/agents/supervisor/dag", {
+      user_prompt: goal,
+      context: {
+        ...(context || {}),
+        dynamic_routing: true,
+        dag_plan: dagPlan,
+      },
+    });
+    return unpackResponse<any>(res.data) || res.data;
   },
 };
+

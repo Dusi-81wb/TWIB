@@ -19,6 +19,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+!frontend/lib/
 parts/
 sdist/
 var/
@@ -133,3 +134,16 @@ charts/*.tgz
 
 # Backup of old git history
 .git.backup/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+twib.db
+backend/twib.db
+
+# Superpowers & SDD artifacts
+.superpowers/
+.agents/
+
+

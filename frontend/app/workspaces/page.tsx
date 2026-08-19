@@ -14,8 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Building2, Plus, Loader2, X } from "lucide-react";
+import { useGsapStagger } from "@/hooks/use-gsap-animations";
 
 export default function WorkspacesPage() {
+  const staggerRef = useGsapStagger<HTMLDivElement>(".gsap-card");
+
   const { data: workspaces = [], isLoading, refetch } = useQuery({
     queryKey: ["workspaces-list"],
     queryFn: () => orgService.getWorkspaces(),
@@ -77,17 +80,17 @@ export default function WorkspacesPage() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar />
           <div className="flex-1 flex overflow-hidden">
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+            <main ref={staggerRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="gsap-card flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight text-foreground">Workspaces</h1>
                   <p className="text-sm text-muted-foreground">
                     Manage project environments, active workflow spaces, and team assignments.
                   </p>
                 </div>
-                <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> Create Workspace
+                <Button size="sm" onClick={() => setIsCreateOpen(true)} className="bg-primary hover:bg-primary/90 text-xs">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Create Workspace
                 </Button>
               </div>
 
@@ -96,6 +99,19 @@ export default function WorkspacesPage() {
                 <div className="flex items-center justify-center p-12">
                   <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                   <span className="text-xs text-muted-foreground">Loading workspaces...</span>
+                </div>
+              ) : workspaces.length === 0 ? (
+                <div className="py-16 text-center flex flex-col items-center justify-center border border-dashed border-border/60 rounded-2xl p-8 bg-card/30">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">No workspaces yet</h3>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                    Create your first workspace to start orchestrating multi-agent DAGs and isolating project workflows.
+                  </p>
+                  <Button size="sm" onClick={() => setIsCreateOpen(true)} className="mt-4 bg-primary hover:bg-primary/90 text-xs">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Create Workspace
+                  </Button>
                 </div>
               ) : (
                 /* Grid list */

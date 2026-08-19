@@ -29,7 +29,7 @@ export default function ResearchAgentPage() {
 
   // Status Header Metrics
   const [latestProvider, setLatestProvider] = useState<string>("omniroute");
-  const [latestModel, setLatestModel] = useState<string>("best-fast");
+  const [latestModel, setLatestModel] = useState<string>("Auto");
   const [latestLatency, setLatestLatency] = useState<number | undefined>(undefined);
   const [latestTokens, setLatestTokens] = useState<
     { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined

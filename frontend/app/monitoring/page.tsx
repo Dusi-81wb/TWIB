@@ -9,9 +9,12 @@ import { RightPanel } from "@/components/dashboard/right-panel";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
-import { Activity, Cpu, Database, Server, ShieldCheck, GitBranch } from "lucide-react";
+import { Activity, Cpu, Database, Server, ShieldCheck, GitBranch, Zap, Radio, CheckCircle2 } from "lucide-react";
+import { useGsapStagger } from "@/hooks/use-gsap-animations";
 
 export default function MonitoringPage() {
+  const staggerRef = useGsapStagger<HTMLDivElement>(".gsap-mon-card");
+
   const { data: health } = useQuery({
     queryKey: ["monitoring-health"],
     queryFn: async () => {
@@ -28,6 +31,13 @@ export default function MonitoringPage() {
     },
   });
 
+  const totalWorkflows = metrics?.total_workflows ?? 0;
+  const runningWorkflows = metrics?.running_workflows ?? 0;
+  const completedWorkflows = metrics?.completed_workflows ?? 0;
+  const avgExecTime = metrics?.average_execution_time_seconds
+    ? `${metrics.average_execution_time_seconds.toFixed(1)}s`
+    : "0.0s";
+
   return (
     <ProtectedRoute>
       <div className="flex h-screen overflow-hidden bg-background">
@@ -35,74 +45,116 @@ export default function MonitoringPage() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar />
           <div className="flex-1 flex overflow-hidden">
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
-              <div className="flex flex-col space-y-1">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  System Monitoring & Diagnostics
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Live backend telemetry, workflow success rates, and service health.
+            <main ref={staggerRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+              {/* Page Header */}
+              <div className="gsap-mon-card flex flex-col space-y-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                    System <span className="motion-gradient-text">Telemetry & Health</span>
+                  </h1>
+                  <Radio className="h-5 w-5 text-emerald-400 animate-pulse" />
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Live backend telemetry, AI gateway status, and dynamic workflow engine performance metrics.
                 </p>
               </div>
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatsCard
-                  title="Total Workflows"
-                  value={metrics?.total_workflows ?? 12}
-                  icon={<GitBranch className="h-5 w-5" />}
-                  trend="Recorded"
-                />
-                <StatsCard
-                  title="Running Workflows"
-                  value={metrics?.running_workflows ?? 3}
-                  icon={<Activity className="h-5 w-5" />}
-                  trend="Live"
-                  trendDirection="up"
-                />
-                <StatsCard
-                  title="Completed Workflows"
-                  value={metrics?.completed_workflows ?? 8}
-                  icon={<ShieldCheck className="h-5 w-5" />}
-                  trend="100% Success"
-                  trendDirection="up"
-                />
-                <StatsCard
-                  title="Avg Execution Time"
-                  value={`${metrics?.average_execution_time_seconds ?? 14.2}s`}
-                  icon={<Cpu className="h-5 w-5" />}
-                  trend="Optimal"
-                />
+                <div className="gsap-mon-card">
+                  <StatsCard
+                    title="Total Workflows"
+                    value={totalWorkflows}
+                    icon={<GitBranch className="h-5 w-5 text-primary" />}
+                    trend={totalWorkflows > 0 ? "Active" : "Ready"}
+                  />
+                </div>
+                <div className="gsap-mon-card">
+                  <StatsCard
+                    title="Running Workflows"
+                    value={runningWorkflows}
+                    icon={<Activity className="h-5 w-5 text-purple-400" />}
+                    trend={runningWorkflows > 0 ? "Executing" : "Idle"}
+                    trendDirection={runningWorkflows > 0 ? "up" : "neutral"}
+                  />
+                </div>
+                <div className="gsap-mon-card">
+                  <StatsCard
+                    title="Completed Workflows"
+                    value={completedWorkflows}
+                    icon={<ShieldCheck className="h-5 w-5 text-emerald-400" />}
+                    trend={completedWorkflows > 0 ? "100% Success" : "Ready"}
+                    trendDirection={completedWorkflows > 0 ? "up" : "neutral"}
+                  />
+                </div>
+                <div className="gsap-mon-card">
+                  <StatsCard
+                    title="Avg Execution Time"
+                    value={avgExecTime}
+                    icon={<Cpu className="h-5 w-5 text-cyan-400" />}
+                    trend="Sub-second"
+                  />
+                </div>
               </div>
 
               {/* Subsystem Health Grid */}
-              <DashboardCard title="Subsystem Components Health">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                  <div className="p-3 rounded-lg border border-border/60 bg-card flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Database className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">PostgreSQL Database</span>
+              <div className="gsap-mon-card">
+                <DashboardCard title="Subsystem Health Matrix">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                    <div className="p-4 rounded-2xl border border-white/10 bg-card/60 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                          <Database className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground block">PostgreSQL</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">Relational Persistence</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={health?.postgres?.status || "healthy"} className="text-[10px]" />
                     </div>
-                    <StatusBadge status={health?.postgres?.status || "healthy"} />
-                  </div>
 
-                  <div className="p-3 rounded-lg border border-border/60 bg-card flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Server className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">Redis Cache & Sessions</span>
+                    <div className="p-4 rounded-2xl border border-white/10 bg-card/60 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                          <Server className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground block">Redis Cache</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">Async Queues & State</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={health?.redis?.status || "healthy"} className="text-[10px]" />
                     </div>
-                    <StatusBadge status={health?.redis?.status || "healthy"} />
-                  </div>
 
-                  <div className="p-3 rounded-lg border border-border/60 bg-card flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Cpu className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">Vector Store (Qdrant)</span>
+                    <div className="p-4 rounded-2xl border border-white/10 bg-card/60 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                          <Cpu className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground block">LLM Gateway</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">Universal API Proxy</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={health?.llm_providers?.status || health?.omniroute?.status || "healthy"} className="text-[10px]" />
                     </div>
-                    <StatusBadge status={health?.vector_store?.status || "healthy"} />
+
+                    <div className="p-4 rounded-2xl border border-white/10 bg-card/60 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                          <Zap className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground block">Vector Store</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">Semantic Memory</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={health?.vector_store?.status || "healthy"} className="text-[10px]" />
+                    </div>
                   </div>
-                </div>
-              </DashboardCard>
+                </DashboardCard>
+              </div>
             </main>
             <RightPanel />
           </div>

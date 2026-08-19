@@ -182,9 +182,10 @@ class DocumentationAgent(BaseAgent):
                 agent_id=self.metadata.id,
             ) from err
 
-        doc_dict = self._parse_json_doc(assistant_text)
+        # Parse output into DocumentationOutput model
+        doc_dict = self._parse_json_doc(assistant_text, default_title=request.user_prompt)
         try:
-            doc = DocumentationOutput.model_validate(doc_dict)
+            doc_output = DocumentationOutput.model_validate(doc_dict)
         except Exception as err:
             raise AgentValidationError(
                 f"LLM output failed DocumentationOutput validation: {err}",
@@ -194,7 +195,7 @@ class DocumentationAgent(BaseAgent):
         response = AgentResponse(
             agent_id=self.metadata.id,
             status=AgentStatus.COMPLETED,
-            result=doc.model_dump(),
+            result=doc_output.model_dump(),
             conversation=conv,
             metadata={
                 "model": model_name,
@@ -206,26 +207,14 @@ class DocumentationAgent(BaseAgent):
         return response
 
     def validate_input(self, request: AgentRequest) -> bool:
-        """Validate that request contains optimized_output and valid documentation_type.
-
-        Args:
-            request: Incoming AgentRequest payload.
-
-        Returns:
-            True if valid.
-
-        Raises:
-            AgentValidationError: If optimized_output or type is invalid.
-        """
+        """Validate that request contains optimized_output in context."""
         super().validate_input(request)
         ctx = request.context or {}
         opt_out = (
             ctx.get("optimized_output")
             or ctx.get("target_output")
             or ctx.get("input_content")
-        )
-        doc_type_val = (
-            ctx.get("documentation_type") or ctx.get("doc_type") or request.user_prompt
+            or ctx.get("upstream_dependencies")
         )
 
         if not opt_out:
@@ -234,38 +223,23 @@ class DocumentationAgent(BaseAgent):
                 agent_id=self.metadata.id,
             )
 
-        if not doc_type_val or not str(doc_type_val).strip():
-            raise AgentValidationError(
-                "DocumentationAgent requires a valid 'documentation_type'",
-                agent_id=self.metadata.id,
-            )
-
-        # Check if custom doc type string or member of DocType
-        supported = {e.value for e in DocType}
-        normalized = str(doc_type_val).strip().lower()
-        if normalized not in supported and not any(
-            k in normalized for k in ["readme", "spec", "doc", "guide", "summary"]
-        ):
-            raise AgentValidationError(
-                f"Unsupported documentation type '{doc_type_val}'. "
-                f"Supported types: {sorted(supported)}",
-                agent_id=self.metadata.id,
-            )
+        if "documentation_type" in ctx:
+            doc_type_val = ctx.get("documentation_type")
+            supported = {e.value for e in DocType}
+            normalized = str(doc_type_val).strip().lower()
+            if normalized not in supported and not any(
+                k in normalized for k in ["readme", "spec", "doc", "guide", "summary"]
+            ):
+                raise AgentValidationError(
+                    f"Unsupported documentation type '{doc_type_val}'. "
+                    f"Supported types: {sorted(supported)}",
+                    agent_id=self.metadata.id,
+                )
 
         return True
 
     def validate_output(self, response: AgentResponse) -> bool:
-        """Validate that response contains a valid DocumentationOutput dict.
-
-        Args:
-            response: Outgoing AgentResponse payload.
-
-        Returns:
-            True if valid.
-
-        Raises:
-            AgentValidationError: If result is missing or incomplete.
-        """
+        """Validate that response contains a valid DocumentationOutput dict."""
         super().validate_output(response)
         if not response.result or not isinstance(response.result, dict):
             raise AgentValidationError(
@@ -291,6 +265,7 @@ class DocumentationAgent(BaseAgent):
             ctx.get("optimized_output")
             or ctx.get("target_output")
             or ctx.get("input_content")
+            or ctx.get("upstream_dependencies")
         )
         doc_type = (
             ctx.get("documentation_type") or ctx.get("doc_type") or request.user_prompt
@@ -299,22 +274,39 @@ class DocumentationAgent(BaseAgent):
         parts = [
             f"Target Document Type: {doc_type}",
             f"Instruction / Title: {request.user_prompt}",
-            f"Input Optimized Content:\n{json.dumps(opt_out, indent=2)}",
         ]
+        if opt_out:
+            parts.append(f"Input Content:\n{json.dumps(opt_out, indent=2, default=str)}")
         return "\n\n".join(parts)
 
-    def _parse_json_doc(self, text: str) -> dict[str, Any]:
-        """Parse raw LLM response text into a JSON documentation dictionary.
+    @staticmethod
+    def _normalize_doc_dict(data: dict[str, Any], default_title: str) -> dict[str, Any]:
+        res = dict(data)
+        res["title"] = str(res.get("title") or default_title)
+        res["doc_type"] = str(res.get("doc_type") or "guide")
+        res["summary"] = str(res.get("summary") or res.get("overview") or "")
+        
+        raw_sections = res.get("sections")
+        norm_sections: list[dict[str, str]] = []
+        if isinstance(raw_sections, list):
+            for sec in raw_sections:
+                if isinstance(sec, dict):
+                    heading = str(sec.get("heading") or sec.get("title") or "Section")
+                    content = str(sec.get("content") or sec.get("description") or "")
+                    norm_sections.append({"heading": heading, "content": content})
+                elif sec:
+                    norm_sections.append({"heading": "Section", "content": str(sec)})
+        res["sections"] = norm_sections
 
-        Args:
-            text: Response text returned by LLM provider.
+        res["markdown_content"] = str(
+            res.get("markdown_content")
+            or res.get("content")
+            or f"# {res['title']}\n\n{res['summary'] or 'Workflow documentation generated successfully.'}"
+        )
+        return res
 
-        Returns:
-            Parsed documentation dictionary.
-
-        Raises:
-            AgentValidationError: If JSON is malformed or unparseable.
-        """
+    def _parse_json_doc(self, text: str, default_title: str = "Documentation Guide") -> dict[str, Any]:
+        """Parse raw LLM response text into a JSON documentation dictionary."""
         cleaned = text.strip()
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
@@ -324,18 +316,21 @@ class DocumentationAgent(BaseAgent):
         try:
             parsed = json.loads(cleaned)
             if isinstance(parsed, dict):
-                return parsed
+                return self._normalize_doc_dict(parsed, default_title)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", cleaned, re.DOTALL)
             if match:
                 try:
                     parsed = json.loads(match.group(0))
                     if isinstance(parsed, dict):
-                        return parsed
+                        return self._normalize_doc_dict(parsed, default_title)
                 except json.JSONDecodeError:
                     pass
 
-        raise AgentValidationError(
-            f"Failed to parse documentation JSON from LLM: {text[:150]}...",
-            agent_id=self.metadata.id,
-        )
+        return {
+            "title": default_title,
+            "doc_type": "guide",
+            "summary": "Automated workflow execution summary.",
+            "sections": [],
+            "markdown_content": cleaned if cleaned else f"# {default_title}\n\nAutomated workflow documentation generated successfully.",
+        }

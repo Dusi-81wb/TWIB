@@ -105,15 +105,93 @@ class OpenAIProvider(LLMProvider):
             client: Optional pre-configured AsyncOpenAI client instance.
             settings: Optional ApplicationSettings instance.
         """
-        app_settings = settings or get_settings()
-        key = api_key or app_settings.openai_api_key
+        self._settings = settings
+        self._explicit_key = api_key
+        self._explicit_client = client
 
-        if client is not None:
-            self._client = client
-        elif AsyncOpenAI is not None and key:
-            self._client = AsyncOpenAI(api_key=key)
-        else:
-            self._client = None
+    @property
+    def _app_settings(self) -> ApplicationSettings:
+        return self._settings or get_settings()
+
+    @property
+    def _client(self) -> Any:
+        try:
+            return self._get_client_or_raise()
+        except Exception:
+            return None
+
+    def _get_client_or_raise(self) -> Any:
+        """Return configured AsyncOpenAI client or dynamically build from current settings."""
+        if self._explicit_client is not None:
+            return self._explicit_client
+
+        if AsyncOpenAI is None:
+            raise AuthenticationError(
+                "AsyncOpenAI SDK is not available.",
+                provider=self.provider_name,
+            )
+
+        app_settings = self._app_settings
+        key = self._explicit_key or app_settings.omniroute_api_key or app_settings.openai_api_key or "sk-omniroute"
+        base_url = (
+            app_settings.omniroute_base_url
+            if app_settings.omniroute_base_url
+            else (app_settings.openai_api_base if app_settings.openai_api_key else "http://localhost:8080/v1")
+        )
+
+        clean_url = (base_url or "http://localhost:8080/v1").rstrip("/")
+        if not clean_url.endswith("/v1"):
+            clean_url = f"{clean_url}/v1"
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": key,
+            "base_url": clean_url,
+        }
+        return AsyncOpenAI(**client_kwargs)
+
+    GENERIC_MODEL_IDENTIFIERS = {
+        "default",
+        "best-fast",
+        "best-free",
+        "best",
+        "auto",
+        "fast",
+        "free",
+        "omniroute/auto",
+        "custom",
+    }
+
+    async def _resolve_target_model(self, requested_model: str | None) -> str:
+        """Resolve valid model identifier dynamically from endpoint or settings."""
+        app_settings = self._app_settings
+        configured = app_settings.default_model
+
+        # 1. If an explicit non-generic model is requested, use it
+        if requested_model and requested_model not in self.GENERIC_MODEL_IDENTIFIERS:
+            if requested_model != "gpt-4o" or (configured == "gpt-4o" or "openai.com" in (app_settings.omniroute_base_url or "")):
+                return requested_model
+
+        # 2. Check if a non-generic model is explicitly configured in settings
+        if configured and configured not in self.GENERIC_MODEL_IDENTIFIERS and configured != "gpt-4o":
+            return configured
+
+        # 3. Query loaded models from endpoint dynamically if available
+        try:
+            discovered = await self.list_models()
+            model_ids = [m.id for m in discovered if m.id and m.id not in self.GENERIC_MODEL_IDENTIFIERS]
+            if model_ids:
+                return model_ids[0]
+        except Exception:
+            pass
+
+        # 4. Fallback if listing was unavailable
+        if requested_model and requested_model != "default":
+            return requested_model
+
+        if configured and configured != "default":
+            return configured
+
+        return "best-free"
 
     async def complete(self, request: ChatRequest) -> ChatResponse:
         """Execute a non-streaming chat completion with OpenAI.
@@ -132,9 +210,10 @@ class OpenAIProvider(LLMProvider):
         """
         client = self._get_client_or_raise()
         messages = self._format_messages(request.messages)
+        target_model = await self._resolve_target_model(request.model)
 
         kwargs: dict[str, Any] = {
-            "model": request.model,
+            "model": target_model,
             "messages": messages,
             "temperature": request.temperature,
             "top_p": request.top_p,
@@ -167,7 +246,7 @@ class OpenAIProvider(LLMProvider):
                 usage=usage,
             )
         except Exception as err:
-            raise self._map_exception(err, request.model) from err
+            raise self._map_exception(err, target_model) from err
 
     async def stream(self, request: ChatRequest) -> AsyncIterator[StreamChunk]:
         """Execute a streaming chat completion with OpenAI.
@@ -183,9 +262,10 @@ class OpenAIProvider(LLMProvider):
         """
         client = self._get_client_or_raise()
         messages = self._format_messages(request.messages)
+        target_model = await self._resolve_target_model(request.model)
 
         kwargs: dict[str, Any] = {
-            "model": request.model,
+            "model": target_model,
             "messages": messages,
             "temperature": request.temperature,
             "top_p": request.top_p,
@@ -211,7 +291,7 @@ class OpenAIProvider(LLMProvider):
                     finish_reason=choice.finish_reason,
                 )
         except Exception as err:
-            raise self._map_exception(err, request.model) from err
+            raise self._map_exception(err, target_model) from err
 
     async def list_models(self) -> list[ModelInfo]:
         """List models available from OpenAI.
@@ -227,27 +307,20 @@ class OpenAIProvider(LLMProvider):
 
         try:
             models_page = await self._client.models.list()
-            fetched_ids = {m.id for m in models_page.data}
             result: list[ModelInfo] = []
-            for default_m in DEFAULT_OPENAI_MODELS:
-                if default_m.id in fetched_ids:
-                    result.append(default_m)
-            # Add any additional OpenAI models returned by API
             for m in models_page.data:
-                if m.id.startswith(("gpt-3.5", "gpt-4", "o1", "o3")) and not any(
-                    r.id == m.id for r in result
-                ):
+                mid = getattr(m, "id", None) or (m.get("id") if isinstance(m, dict) else str(m))
+                if mid:
                     result.append(
                         ModelInfo(
-                            id=m.id,
-                            name=m.id.upper(),
+                            id=mid,
+                            name=mid,
                             provider=self.provider_name,
-                            context_window=4096,
+                            context_window=8192,
                         )
                     )
             return result or DEFAULT_OPENAI_MODELS
         except Exception as err:
-            # Fall back to default model list if listing fails
             _ = err
             return DEFAULT_OPENAI_MODELS
 
@@ -268,22 +341,6 @@ class OpenAIProvider(LLMProvider):
     # ------------------------------------------------------------------
     # Internal Helpers
     # ------------------------------------------------------------------
-
-    def _get_client_or_raise(self) -> Any:
-        """Return configured AsyncOpenAI client or raise AuthenticationError.
-
-        Returns:
-            The active AsyncOpenAI client instance.
-
-        Raises:
-            AuthenticationError: If API key is missing or client is uninitialized.
-        """
-        if self._client is None:
-            raise AuthenticationError(
-                "OpenAI API key is missing or client is uninitialized",
-                provider=self.provider_name,
-            )
-        return self._client
 
     @staticmethod
     def _format_messages(messages: list[ChatMessage]) -> list[dict[str, Any]]:

@@ -29,6 +29,11 @@ class WorkflowEventType(StrEnum):
     AGENT_STARTED = "agent.started"
     AGENT_COMPLETED = "agent.completed"
     AGENT_FAILED = "agent.failed"
+    DAG_PLANNED = "dag.planned"
+    NODE_STARTED = "node.started"
+    NODE_COMPLETED = "node.completed"
+    NODE_FAILED = "node.failed"
+    NODE_SKIPPED = "node.skipped"
 
 
 class WorkflowEvent(BaseModel):

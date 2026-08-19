@@ -90,6 +90,19 @@ export default function OrganizationsPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                   <span className="text-xs text-muted-foreground">Loading organizations...</span>
                 </div>
+              ) : orgs.length === 0 ? (
+                <div className="py-16 text-center flex flex-col items-center justify-center border border-dashed border-border/60 rounded-2xl p-8 bg-card/30">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
+                    <Building className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">No organizations yet</h3>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                    Create your first organization to group teams, manage tenant permissions, and isolate workspaces.
+                  </p>
+                  <Button size="sm" onClick={() => setIsCreateOpen(true)} className="mt-4 bg-primary hover:bg-primary/90 text-xs">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Create Organization
+                  </Button>
+                </div>
               ) : (
                 /* Grid list */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -221,12 +221,16 @@ def get_audit_service(request: Request) -> AuditService:
 def get_current_user_claims(
     request: Request,
     jwt_helper: JWTHelper = Depends(get_jwt_helper),
+    settings: ApplicationSettings = Depends(get_settings),
 ) -> dict[str, Any]:
     """Decode and extract authenticated user claims from Authorization header.
+
+    Supports both local TWIB JWTs and Supabase GoTrue Auth JWTs.
 
     Args:
         request: The active FastAPI request.
         jwt_helper: Injected JWTHelper dependency.
+        settings: ApplicationSettings dependency.
 
     Returns:
         Dictionary of token claims containing sub (user_id), email, role, etc.
@@ -243,14 +247,25 @@ def get_current_user_claims(
         )
 
     token = auth_header.split(" ", 1)[1].strip()
+    
+    # 1. Try local TWIB JWT decode
     try:
         return jwt_helper.decode_token(token)
-    except (InvalidTokenError, TokenExpiredError) as err:
+    except (InvalidTokenError, TokenExpiredError):
+        pass
+
+    # 2. Try Supabase JWT verification
+    try:
+        from app.security.supabase_auth import verify_supabase_jwt
+
+        return verify_supabase_jwt(token, settings.supabase_jwt_secret)
+    except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(err),
+            detail=f"Invalid or expired authentication token: {err}",
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
+
 
 
 def get_user_service(
