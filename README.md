@@ -117,7 +117,78 @@ TWIB/
 
 ---
 
+## 🚀 Quick Start
+
+### Prerequisites
+* **Python**: 3.12 or higher
+* **Node.js**: 18.x or 20.x (with npm)
+* **Docker & Docker Compose** (optional, for full containerized stack)
+
+---
+
+### Option A: Local Development Setup
+
+#### 1. Clone the repository
+```bash
+git clone https://github.com/Dusi-81wb/TWIB.git
+cd TWIB
+```
+
+#### 2. Backend Setup (FastAPI)
+```bash
+cd backend
+
+# Create and activate Python virtual environment
+python -m venv .venv
+# On Windows:
+.\.venv\Scripts\activate
+# On Linux/macOS:
+source .venv/bin/activate
+
+# Install dependencies (Standard pip)
+pip install -r requirements.txt
+
+# Or using uv (Fast package manager)
+# uv sync
+
+# Configure environment variables
+cp .env.example .env
+
+# Run FastAPI Server
+uvicorn app.main:app --reload --port 8000
+```
+* **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Health Check**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+
+#### 3. Frontend Setup (Next.js 15)
+In a new terminal window:
+```bash
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env.local
+
+# Run Next.js Dev Server
+npm run dev
+```
+* **Web Application**: [http://localhost:3000](http://localhost:3000)
+
+---
+
+### Option B: Docker Compose Setup
+
+Run the entire platform (Backend, Frontend, PostgreSQL, Redis, Qdrant) with a single command:
+```bash
+docker compose -f docker/development/docker-compose.yml up --build
+```
+
+---
+
 ## Technology Stack
+
 
 ### Backend
 | Component | Technology | Rationale |
