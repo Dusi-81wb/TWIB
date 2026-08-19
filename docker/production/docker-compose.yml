@@ -1,0 +1,95 @@
+# TWIB production Docker Compose stack.
+#
+# Runs the backend together with its supporting services (PostgreSQL,
+# Redis, Qdrant) on a dedicated production bridge network. The backend is
+# built from the minimal multi-stage production image (`target: runtime`);
+# there are no source bind mounts and no hot reload. Configuration is read
+# from backend/.env through the existing settings system; no secrets are
+# hardcoded here.
+
+name: twib-prod
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: twib-prod-backend
+    env_file:
+      - ../../backend/.env
+    environment:
+      APP_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - twib-prod
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: twib-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-twib}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twib}
+      POSTGRES_DB: ${POSTGRES_DB:-twib}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-twib} -d ${POSTGRES_DB:-twib}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - twib-prod
+
+  redis:
+    image: redis:7-alpine
+    container_name: twib-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - twib-prod
+
+  qdrant:
+    image: qdrant/qdrant:v1.14.0
+    container_name: twib-prod-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", ":> /dev/tcp/127.0.0.1/6333"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - twib-prod
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+
+networks:
+  twib-prod:
+    driver: bridge

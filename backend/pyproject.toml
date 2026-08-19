@@ -1,0 +1,85 @@
+[project]
+name = "twib-backend"
+version = "0.1.0"
+description = "TWIB backend FastAPI application."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13",
+    "asyncpg>=0.29",
+    "dependency-injector>=4.41",
+    "fastapi>=0.115",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.0",
+    "pwdlib[argon2]>=0.2",
+    "pyjwt>=2.8",
+    "qdrant-client>=1.9",
+    "redis>=5.0",
+    "sqlalchemy>=2.0",
+    "structlog>=24.1",
+    "uvicorn>=0.30",
+    "email-validator>=2.3.0",
+    "openai>=1.30.0",
+    "httpx>=0.27",
+    "aiosqlite>=0.22.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "mypy>=1.14",
+    "pre-commit>=3.7",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "ruff>=0.11",
+    "types-requests>=2.32",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["."]
+exclude = [".venv", "migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "RUF",    # ruff-specific rules
+    "ASYNC",  # flake8-async
+    "S",      # bandit (security)
+    "A",      # flake8-builtins
+]
+ignore = [
+    "ASYNC220",  # async exception handlers legitimately await nothing
+    "UP040",     # keep typing.TypeAlias aliases so alias docstrings survive
+    "B008",      # FastAPI Depends() in default parameters
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert statements are the point of tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+show_error_codes = true
+exclude = [".venv/"]
