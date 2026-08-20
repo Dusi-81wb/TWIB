@@ -160,8 +160,9 @@ class DynamicDAGPlanner:
 
                 chat_res = await asyncio.wait_for(
                     llm_provider.complete(chat_req),
-                    timeout=ctx.get("llm_timeout", 30.0),
+                    timeout=ctx.get("llm_timeout", 3.0),
                 )
+
                 plan = self._parse_llm_dag_response(goal, chat_res.message.content)
                 plan.validate_graph()
                 return plan

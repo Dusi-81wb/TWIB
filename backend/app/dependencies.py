@@ -444,6 +444,11 @@ def get_websocket_manager(request: Request) -> Any:
     return get_container(request).websocket_manager()
 
 
+def get_tool_registry(request: Request) -> Any:
+    """Resolve ToolRegistry instance from the DI container."""
+    return get_container(request).tool_registry()
+
+
 def get_workflow_event_publisher(request: Request) -> Any:
     """Resolve WorkflowEventPublisher instance from the DI container."""
     return get_container(request).workflow_event_publisher()
@@ -452,3 +457,4 @@ def get_workflow_event_publisher(request: Request) -> Any:
 def get_monitoring_service(request: Request) -> Any:
     """Resolve MonitoringService instance from the DI container."""
     return get_container(request).monitoring_service()
+

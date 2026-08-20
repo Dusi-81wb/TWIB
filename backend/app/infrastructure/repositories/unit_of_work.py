@@ -1,8 +1,7 @@
 """SQLAlchemy Unit of Work implementation.
 
-This module implements :class:`~app.domain.repositories.unit_of_work.UnitOfWork`
-backed by an AsyncSession. It groups the repositories for User, Organization,
-and Workspace aggregates so that use cases commit or roll back changes atomically.
+Coordinates User, Organization, Workspace, and Workflow aggregate repositories
+over a single AsyncSession transaction boundary.
 """
 
 from __future__ import annotations
@@ -17,37 +16,35 @@ from app.infrastructure.repositories.organization_repository import (
     SQLAlchemyOrganizationRepository,
 )
 from app.infrastructure.repositories.user_repository import SQLAlchemyUserRepository
+from app.infrastructure.repositories.workflow_repository import (
+    WorkflowCheckpointRepository,
+    WorkflowExecutionRepository,
+    WorkflowRepository,
+)
 from app.infrastructure.repositories.workspace_repository import (
     SQLAlchemyWorkspaceRepository,
 )
 
 
 class SQLAlchemyUnitOfWork(UnitOfWork):
-    """SQLAlchemy implementation of the UnitOfWork contract.
-
-    Coordinates UserRepository, OrganizationRepository, and WorkspaceRepository
-    over a single AsyncSession transaction boundary.
-
-    Attributes:
-        users: Repository for User aggregates.
-        organizations: Repository for Organization aggregates.
-        workspaces: Repository for Workspace aggregates.
-    """
+    """SQLAlchemy implementation of the UnitOfWork contract."""
 
     users: SQLAlchemyUserRepository
     organizations: SQLAlchemyOrganizationRepository
     workspaces: SQLAlchemyWorkspaceRepository
+    workflows: WorkflowRepository
+    workflow_executions: WorkflowExecutionRepository
+    workflow_checkpoints: WorkflowCheckpointRepository
 
     def __init__(self, session: AsyncSession) -> None:
-        """Initialize the Unit of Work bound to an AsyncSession.
-
-        Args:
-            session: The active AsyncSession.
-        """
+        """Initialize the Unit of Work bound to an AsyncSession."""
         self._session = session
         self.users = SQLAlchemyUserRepository(session)
         self.organizations = SQLAlchemyOrganizationRepository(session)
         self.workspaces = SQLAlchemyWorkspaceRepository(session)
+        self.workflows = WorkflowRepository(session)
+        self.workflow_executions = WorkflowExecutionRepository(session)
+        self.workflow_checkpoints = WorkflowCheckpointRepository(session)
 
     async def commit(self) -> None:
         """Commit the active database transaction."""

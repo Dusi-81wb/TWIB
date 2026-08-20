@@ -90,6 +90,11 @@ class LLMProviderFactory:
         """
         self._registry.register_class(name, provider_cls)
 
+    def register_instance(self, name: str, instance: LLMProvider) -> None:
+        """Register a pre-instantiated LLMProvider instance (useful for testing/mocks)."""
+        self._instances[name.strip().lower()] = instance
+
+
     def is_registered(self, name: str) -> bool:
         """Check whether a provider name is registered.
 

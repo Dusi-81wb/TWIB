@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,7 +37,12 @@ export function WorkflowForm() {
   const [isDynamicDAG, setIsDynamicDAG] = useState<boolean>(true);
   const [dagPlan, setDagPlan] = useState<AgentDAGPlan | null>(null);
 
+  const handlePlanChange = useCallback((plan: AgentDAGPlan) => {
+    setDagPlan(plan);
+  }, []);
+
   const router = useRouter();
+
 
   const {
     register,
@@ -201,9 +206,10 @@ export function WorkflowForm() {
         {isDynamicDAG ? (
           <DynamicDAGBuilder
             initialGoal={watchedValues.user_request}
-            onPlanChange={(plan) => setDagPlan(plan)}
+            onPlanChange={handlePlanChange}
           />
         ) : (
+
           <PipelinePreview />
         )}
       </div>

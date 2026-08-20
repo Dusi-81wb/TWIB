@@ -2,36 +2,33 @@
 
 A unit of work groups all repository operations for a single business
 transaction and exposes one commit point, so a use case either persists
-completely or not at all. This module declares the
-:class:`~app.domain.repositories.unit_of_work.UnitOfWork` contract; a concrete
-implementation (session-bound repositories, ``commit()``, ``rollback()``) is
-provided by the database infrastructure phase.
+completely or not at all.
 """
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from app.domain.repositories.organization_repository import OrganizationRepository
-from app.domain.repositories.user_repository import UserRepository
-from app.domain.repositories.workspace_repository import WorkspaceRepository
+if TYPE_CHECKING:
+    from app.domain.repositories.organization_repository import OrganizationRepository
+    from app.domain.repositories.user_repository import UserRepository
+    from app.domain.repositories.workspace_repository import WorkspaceRepository
+    from app.domain.workflows.repositories import (
+        IWorkflowCheckpointRepository,
+        IWorkflowExecutionRepository,
+        IWorkflowRepository,
+    )
 
 
 class UnitOfWork(Protocol):
-    """Transaction boundary that coordinates the aggregate repositories.
+    """Transaction boundary that coordinates the aggregate repositories."""
 
-    A unit of work owns the three aggregate repositories and exposes a single
-    :meth:`commit` point, so a business operation either persists completely
-    or not at all. The repositories are exposed as plain attributes; an
-    implementation returns request-scoped (or session-bound) repository
-    instances. A use case acquires one unit of work, performs its repository
-    operations, and calls :meth:`commit` exactly once (or :meth:`rollback` on
-    failure).
-    """
-
-    users: UserRepository
-    organizations: OrganizationRepository
-    workspaces: WorkspaceRepository
+    users: Any
+    organizations: Any
+    workspaces: Any
+    workflows: Any
+    workflow_executions: Any
+    workflow_checkpoints: Any
 
     async def commit(self) -> None:
         """Commit the current transaction, persisting every change."""

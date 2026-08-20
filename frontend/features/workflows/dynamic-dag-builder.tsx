@@ -52,16 +52,42 @@ export function DynamicDAGBuilder({
     if (initialGoal) setGoal(initialGoal);
   }, [initialGoal]);
 
-  // Sync plan changes to parent
+  const onPlanChangeRef = React.useRef(onPlanChange);
+  useEffect(() => {
+    onPlanChangeRef.current = onPlanChange;
+  }, [onPlanChange]);
+
+  const lastPlanSignatureRef = React.useRef<string>("");
+
+  // Sync plan changes to parent only when graph content actually changes
   useEffect(() => {
     if (nodes.length > 0) {
-      const plan = exportPlan({
-        goal: goal || "Custom visual multi-agent workflow",
-        rationale: aiRationale || "Visual interactive DAG",
+      const signature = JSON.stringify({
+        nodes: nodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          data: n.data,
+        })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+        })),
+        goal: goal || "",
+        rationale: aiRationale || "",
       });
-      onPlanChange?.(plan);
+
+      if (signature !== lastPlanSignatureRef.current) {
+        lastPlanSignatureRef.current = signature;
+        const plan = exportPlan({
+          goal: goal || "Custom visual multi-agent workflow",
+          rationale: aiRationale || "Visual interactive DAG",
+        });
+        onPlanChangeRef.current?.(plan);
+      }
     }
-  }, [nodes, edges, goal, aiRationale, exportPlan, onPlanChange]);
+  }, [nodes, edges, goal, aiRationale, exportPlan]);
+
 
   const handleGeneratePlan = async () => {
     const targetGoal = goal?.trim() || initialGoal?.trim();

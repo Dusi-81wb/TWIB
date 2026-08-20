@@ -3,14 +3,6 @@
 The container is built with ``dependency-injector`` and owns the object
 graph of the application. Every dependency is resolved through a provider,
 so components never instantiate their collaborators directly.
-
-Currently registered providers:
-
-- ``settings``: the application configuration singleton.
-- ``logger``: a factory that returns named structured loggers.
-
-Future services, repositories, and infrastructure adapters will be
-registered here as additional providers.
 """
 
 from dependency_injector import containers, providers
@@ -35,7 +27,11 @@ from app.infrastructure.repositories import (
     SQLAlchemyUnitOfWork,
     SQLAlchemyUserRepository,
     SQLAlchemyWorkspaceRepository,
+    WorkflowCheckpointRepository,
+    WorkflowExecutionRepository,
+    WorkflowRepository,
 )
+from app.infrastructure.tools import ToolRegistry
 from app.infrastructure.vector import (
     get_vector_store_client as _resolve_vector_store_client,
 )
@@ -73,7 +69,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
     user_repository = providers.Factory(SQLAlchemyUserRepository)
     organization_repository = providers.Factory(SQLAlchemyOrganizationRepository)
     workspace_repository = providers.Factory(SQLAlchemyWorkspaceRepository)
+    workflow_repository = providers.Factory(WorkflowRepository)
+    workflow_execution_repository = providers.Factory(WorkflowExecutionRepository)
+    workflow_checkpoint_repository = providers.Factory(WorkflowCheckpointRepository)
     unit_of_work = providers.Factory(SQLAlchemyUnitOfWork)
+    tool_registry = providers.Singleton(ToolRegistry)
     redis_client = providers.Factory(_resolve_redis_client)
     vector_client = providers.Factory(_resolve_vector_store_client)
     password_hasher = providers.Singleton(PasswordHasher)

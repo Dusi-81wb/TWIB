@@ -26,12 +26,24 @@ export function DAGVisualizer({
 }: DAGVisualizerProps) {
   const { loadPlan, updateNodeExecution, nodes } = useWorkflowCanvasStore();
 
+  const lastLoadedPlanRef = React.useRef<string>("");
+
   // Load initial or changed plan into canvas store
   useEffect(() => {
     if (plan && plan.nodes && plan.nodes.length > 0) {
-      loadPlan(plan);
+      const planKey = JSON.stringify({
+        plan_id: plan.plan_id,
+        goal: plan.goal,
+        nodes: plan.nodes.map((n) => ({ id: n.node_id, deps: n.dependencies })),
+      });
+
+      if (planKey !== lastLoadedPlanRef.current) {
+        lastLoadedPlanRef.current = planKey;
+        loadPlan(plan);
+      }
     }
   }, [plan, loadPlan]);
+
 
   // Sync execution status from nodeStates and activeNodeId
   useEffect(() => {
